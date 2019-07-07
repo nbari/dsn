@@ -13,3 +13,4 @@ license-file = "LICENSE"
 edition = "2018"
 
 [dependencies]
+url = "1.7.2"
