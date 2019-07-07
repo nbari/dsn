@@ -2,18 +2,19 @@ use std::{error::Error, fmt};
 
 #[derive(Debug, Default)]
 pub struct DSN {
-    driver: &'static str,
-    username: &'static str,
-    password: &'static str,
-    host: &'static str,
+    driver: String,
+    username: String,
+    password: String,
+    host: String,
     port: u16,
-    database: &'static str,
-    socket: &'static str,
+    database: String,
+    socket: String,
 }
 
 #[derive(Debug)]
 pub enum ParseError {
     InvalidPort,
+    InvalidDriver,
 }
 
 impl fmt::Display for ParseError {
@@ -26,27 +27,28 @@ impl Error for ParseError {
     fn description(&self) -> &str {
         match *self {
             ParseError::InvalidPort => "invalid port number",
+            ParseError::InvalidDriver => "invalid driver",
         }
     }
 }
 
 pub fn parse(input: &str) -> Result<DSN, ParseError> {
-    for c in input.chars() {
-        match c {
-            ':' => println!("push to buffer"),
-            _ => println!("{}", c),
-        }
-    }
-    let dsn = DSN::default();
-    Ok(dsn)
-}
+    let mut dsn = DSN::default();
+    let mut chars = input.chars();
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    loop {
+        let c = chars.next();
+        if c == Some(':') {
+            if chars.next() == Some('/') && chars.next() == Some('/') {
+                break;
+            }
+            return Err(ParseError::InvalidDriver);
+        }
+        dsn.driver.push(c.unwrap());
     }
+    println!("{:?}", dsn);
+
+    Ok(dsn)
 }
 
 pub fn default_port(scheme: &str) -> Option<u16> {
@@ -55,5 +57,16 @@ pub fn default_port(scheme: &str) -> Option<u16> {
         "pgsql" => Some(5432),
         "redis" => Some(6379),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse() {
+        let dsn = parse("mysql://user:password@host:port/database").unwrap();
+        assert_eq!(dsn.driver, "mysql");
     }
 }
