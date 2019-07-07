@@ -1,0 +1,15 @@
+[package]
+name = "dsn"
+version = "0.1.0"
+authors = ["Nicolas Embriz <nbari@tequila.io>"]
+description = "DSN (Data Source Name) parser"
+documentation = "https://github.com/nbari/dsn/blob/master/README.md"
+homepage = "https://github.com/nbari/dsn"
+repository = "https://github.com/nbari/dsn"
+readme = "README.md"
+keywords = ["database", "dsn", "parser"]
+categories = ["parsing", "database"]
+license-file = "LICENSE"
+edition = "2018"
+
+[dependencies]
