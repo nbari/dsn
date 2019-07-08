@@ -106,8 +106,17 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        let dsn = parse("mysql://user:password@host:port/database").unwrap();
+        // let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
+        let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
         println!("{:?}", dsn);
         assert_eq!(dsn.driver, "mysql");
     }
+
+    /*
+    #[test]
+    fn test_parse_password() {
+        let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
+        assert_eq!(dsn.password, r#"pas':"'sword44444"#);
+    }
+    */
 }
