@@ -15,6 +15,7 @@ pub struct DSN {
 pub enum ParseError {
     InvalidPort,
     InvalidDriver,
+    MissingUsername,
 }
 
 impl fmt::Display for ParseError {
@@ -28,6 +29,7 @@ impl Error for ParseError {
         match *self {
             ParseError::InvalidPort => "invalid port number",
             ParseError::InvalidDriver => "invalid driver",
+            ParseError::MissingUsername => "missing username",
         }
     }
 }
@@ -35,29 +37,58 @@ impl Error for ParseError {
 pub fn parse(input: &str) -> Result<DSN, ParseError> {
     let mut dsn = DSN::default();
 
-    let mut chars = get_driver(input.chars())?;
+    let chars = &mut input.chars();
 
-    loop {
-        let c = chars.next();
-        if c == Some(':') {
+    dsn.driver = get_driver(chars)?;
+    let (user, pass) = get_username_password(chars)?;
+    dsn.username = user;
+    dsn.password = pass;
+    Ok(dsn)
+}
+
+fn get_driver(chars: &mut std::str::Chars) -> Result<String, ParseError> {
+    let mut driver = String::new();
+    while let Some(c) = chars.next() {
+        if c == ':' {
             if chars.next() == Some('/') && chars.next() == Some('/') {
                 break;
             }
             return Err(ParseError::InvalidDriver);
         }
-        dsn.driver.push(c.unwrap());
+        driver.push(c);
     }
-    println!("{:?}", dsn);
-
-    Ok(dsn)
+    Ok(driver)
 }
 
-fn get_driver(chars: std::str::Chars) -> Result<std::str::Chars, ParseError> {
-    let x = chars;
-    for c in x {
-        println!("{}", c);
+fn get_username_password(chars: &mut std::str::Chars) -> Result<(String, String), ParseError> {
+    let mut username = String::new();
+    let mut password = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            '@' => {
+                if username.len() == 0 {
+                    return Err(ParseError::MissingUsername);
+                }
+                break;
+            }
+            ':' => {
+                if username.len() == 0 {
+                    return Err(ParseError::MissingUsername);
+                }
+                break;
+            }
+            _ => (),
+        }
+        username.push(c);
     }
-    Ok(ck)
+    while let Some(c) = chars.next() {
+        match c {
+            '@' => break,
+            _ => (),
+        }
+        password.push(c);
+    }
+    Ok((username, password))
 }
 
 pub fn default_port(scheme: &str) -> Option<u16> {
@@ -76,6 +107,7 @@ mod tests {
     #[test]
     fn test_parse() {
         let dsn = parse("mysql://user:password@host:port/database").unwrap();
+        println!("{:?}", dsn);
         assert_eq!(dsn.driver, "mysql");
     }
 }
