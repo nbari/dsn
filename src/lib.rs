@@ -82,7 +82,6 @@ fn get_username_password(chars: &mut std::str::Chars) -> Result<(String, String)
         }
         username.push(c);
     }
-    let ok = percent_decode(username).decode_utf8().unwrap();
     while let Some(c) = chars.next() {
         match c {
             '@' => break,
@@ -90,7 +89,16 @@ fn get_username_password(chars: &mut std::str::Chars) -> Result<(String, String)
         }
         password.push(c);
     }
-    Ok((username, password))
+    Ok((
+        percent_decode(username.as_bytes())
+            .decode_utf8()
+            .unwrap()
+            .into(),
+        percent_decode(password.as_bytes())
+            .decode_utf8()
+            .unwrap()
+            .into(),
+    ))
 }
 
 pub fn default_port(scheme: &str) -> Option<u16> {
@@ -109,7 +117,7 @@ mod tests {
     #[test]
     fn test_parse() {
         // let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
-        let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
+        let dsn = parse(r#"mysql://user:pas':"'sword4o%3Ao@host:port/database"#).unwrap();
         println!("{:?}", dsn);
         assert_eq!(dsn.driver, "mysql");
     }
