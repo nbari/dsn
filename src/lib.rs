@@ -1,4 +1,5 @@
 use std::{error::Error, fmt};
+use url::percent_encoding::percent_decode;
 
 #[derive(Debug, Default)]
 pub struct DSN {
@@ -81,6 +82,7 @@ fn get_username_password(chars: &mut std::str::Chars) -> Result<(String, String)
         }
         username.push(c);
     }
+    let ok = percent_decode(username).decode_utf8().unwrap();
     while let Some(c) = chars.next() {
         match c {
             '@' => break,
