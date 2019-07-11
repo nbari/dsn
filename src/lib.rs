@@ -5,11 +5,11 @@ use url::percent_encoding::percent_decode;
 pub struct DSN {
     driver: String,
     username: String,
-    password: String,
+    password: Option<String>,
     host: String,
     port: Option<u16>,
-    database: String,
-    socket: String,
+    database: Option<String>,
+    socket: Option<String>,
 }
 
 #[derive(Debug)]
@@ -47,10 +47,10 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     dsn.driver = get_driver(chars)?;
     let (user, pass) = get_username_password(chars)?;
     dsn.username = user;
-    dsn.password = pass;
+    dsn.password = Some(pass);
     let (host, port, socket) = get_host_port_socket(chars)?;
     dsn.host = host;
-    dsn.socket = socket;
+    dsn.socket = Some(socket);
 
     if port.len() > 0 {
         dsn.port = match port.parse::<u16>() {
@@ -183,11 +183,11 @@ mod tests {
         println!("{:?}", dsn);
         assert_eq!(dsn.driver, "mysql");
         assert_eq!(dsn.username, "user");
-        assert_eq!(dsn.password, "o:o");
+        assert_eq!(dsn.password.unwrap(), "o:o");
         assert_eq!(dsn.host, "host");
-        assert_eq!(dsn.port, Some(3306));
-        assert_eq!(dsn.database, "");
-        assert_eq!(dsn.socket, "");
+        assert_eq!(dsn.port.unwrap(), 3306);
+        assert_eq!(dsn.database, None);
+        assert_eq!(dsn.socket.unwrap(), "");
     }
 
     /*
