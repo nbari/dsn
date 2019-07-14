@@ -1,4 +1,4 @@
-use std::{error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt};
 use url::percent_encoding::percent_decode;
 
 #[derive(Debug, Default)]
@@ -10,6 +10,7 @@ pub struct DSN {
     port: Option<u16>,
     database: Option<String>,
     socket: Option<String>,
+    params: HashMap<String, String>,
 }
 
 #[derive(Debug)]
