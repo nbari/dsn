@@ -16,4 +16,4 @@ edition = "2018"
 travis-ci = { repository = "nbari/dsn", branch = "master" }
 
 [dependencies]
-url = "1.7.2"
+percent-encoding = "2.1.0"

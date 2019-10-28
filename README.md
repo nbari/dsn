@@ -6,28 +6,20 @@
 
 DSN format:
 
-    <driver>://<username>:<password>@<host>:<port>/<database>
+    <driver>://<username>:<password>@<protocol>(<address>)/<database>?param1=value1&...&paramN=valueN
+
+A DSN in its fullest form:
+
+    driver://username:password@protocol(address)/dbname?param=value
+
+For protocol `TCP/UDP` address have the form `host:port`.
+
+For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket.
+
+Connect to database on a non standard port:
+
+    pgsql://user:pass@tcp(localhost:5555)/dbname
 
 When using a Unix domain socket:
 
-    <driver>://<username>:<password>@unix:<socket>/<database>
-
-Extra params are optional, for example:
-
-    <driver>://<username>:password>@unix:<socket>/<database>[?param1=value1&...&paramN=valueN]
-
-## Defaults
-
-Based on the `driver` the defaults are set.
-
-for example:
-
-    mysql://user:password@localhost/
-
-If port is omitted, and the driver is `mysql` port `3306` will be used.
-
-For redis:
-
-    redis://localhost
-
-port will be `6379` and database number `0`
+    mysql://user@unix(/path/to/socket)/database

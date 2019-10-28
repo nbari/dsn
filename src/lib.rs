@@ -1,17 +1,5 @@
-use std::{collections::HashMap, error::Error, fmt};
-use url::percent_encoding::percent_decode;
-
-#[derive(Debug, Default)]
-pub struct DSN {
-    driver: String,
-    username: String,
-    password: Option<String>,
-    host: String,
-    port: Option<u16>,
-    database: Option<String>,
-    socket: Option<String>,
-    params: HashMap<String, String>,
-}
+use percent_encoding::percent_decode;
+use std::{collections::HashMap, error::Error, fmt, str::Chars};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -40,15 +28,41 @@ impl Error for ParseError {
     }
 }
 
+/// driver://username:password@protocol(address)/dbname?param=value
+#[derive(Debug, Default)]
+pub struct DSN {
+    driver: String,
+    username: String,
+    password: Option<String>,
+    protocol: String,
+    address: String,
+    host: String,
+    port: Option<u16>,
+    database: Option<String>,
+    socket: Option<String>,
+    params: HashMap<String, String>,
+}
+
 pub fn parse(input: &str) -> Result<DSN, ParseError> {
+    // create an empty DSN
     let mut dsn = DSN::default();
 
+    // create an interator for input
     let chars = &mut input.chars();
 
+    // <driver>://
     dsn.driver = get_driver(chars)?;
+
+    // <username>:<password>@
     let (user, pass) = get_username_password(chars)?;
     dsn.username = user;
-    dsn.password = Some(pass);
+    if pass.len() > 0 {
+        dsn.password = Some(pass);
+    } else {
+        dsn.password = None;
+    }
+
+    // <host|unix>:<port|/path/to/socket>
     let (host, port, socket) = get_host_port_socket(chars)?;
     dsn.host = host;
     dsn.socket = Some(socket);
@@ -65,7 +79,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     Ok(dsn)
 }
 
-fn get_driver(chars: &mut std::str::Chars) -> Result<String, ParseError> {
+fn get_driver(chars: &mut Chars) -> Result<String, ParseError> {
     let mut driver = String::new();
     while let Some(c) = chars.next() {
         if c == ':' {
@@ -79,9 +93,10 @@ fn get_driver(chars: &mut std::str::Chars) -> Result<String, ParseError> {
     Ok(driver)
 }
 
-fn get_username_password(chars: &mut std::str::Chars) -> Result<(String, String), ParseError> {
+fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseError> {
     let mut username = String::new();
     let mut password = String::new();
+    // username
     while let Some(c) = chars.next() {
         match c {
             '@' => {
@@ -99,6 +114,7 @@ fn get_username_password(chars: &mut std::str::Chars) -> Result<(String, String)
             _ => username.push(c),
         }
     }
+    // password
     while let Some(c) = chars.next() {
         match c {
             '@' => break,
@@ -117,9 +133,7 @@ fn get_username_password(chars: &mut std::str::Chars) -> Result<(String, String)
     ))
 }
 
-fn get_host_port_socket(
-    chars: &mut std::str::Chars,
-) -> Result<(String, String, String), ParseError> {
+fn get_host_port_socket(chars: &mut Chars) -> Result<(String, String, String), ParseError> {
     let mut host = String::new();
     let mut port = String::new();
     let mut socket = String::new();
