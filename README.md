@@ -1,6 +1,8 @@
-# DSN
+# DSN (Data Source Name) parser
 
-DSN (Data Source Name) parser
+[![crates.io](https://img.shields.io/crates/v/dsn.svg)](https://crates.io/crates/dsn)
+[![Build Status](https://travis-ci.org/nbari/dsn.svg?branch=master)](https://travis-ci.org/nbari/dsn)
+
 
 DSN format:
 
