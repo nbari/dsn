@@ -6,6 +6,8 @@ pub enum ParseError {
     InvalidPort,
     InvalidDriver,
     MissingUsername,
+    MissingProtocol,
+    MissingAddress,
     MissingHost,
     MissingSocket,
 }
@@ -22,6 +24,8 @@ impl Error for ParseError {
             ParseError::InvalidPort => "invalid port number",
             ParseError::InvalidDriver => "invalid driver",
             ParseError::MissingUsername => "missing username",
+            ParseError::MissingProtocol => "missing protocol",
+            ParseError::MissingAddress => "missing address",
             ParseError::MissingHost => "missing host",
             ParseError::MissingSocket => "missing unix domain socket",
         }
@@ -62,19 +66,24 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
         dsn.password = None;
     }
 
-    // <host|unix>:<port|/path/to/socket>
-    let (host, port, socket) = get_host_port_socket(chars)?;
-    dsn.host = host;
-    dsn.socket = Some(socket);
+    // protocol(
+    dsn.protocol = get_protocol(chars)?;
 
-    if port.len() > 0 {
-        dsn.port = match port.parse::<u16>() {
-            Ok(n) => Some(n),
-            Err(_) => return Err(ParseError::InvalidPort),
-        }
-    } else if dsn.host != "unix" {
-        dsn.port = get_default_port(dsn.driver.as_str());
-    }
+    // address) <host:port|/path/to/socket>
+    dsn.address = get_address(chars)?;
+
+    //let (host, port, socket) = get_address(chars)?;
+    //dsn.host = host;
+    //dsn.socket = Some(socket);
+
+    //if port.len() > 0 {
+    //dsn.port = match port.parse::<u16>() {
+    //Ok(n) => Some(n),
+    //Err(_) => return Err(ParseError::InvalidPort),
+    //}
+    //} else if dsn.host != "unix" {
+    //dsn.port = get_default_port(dsn.driver.as_str());
+    //}
 
     Ok(dsn)
 }
@@ -131,6 +140,38 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
             .unwrap()
             .into(),
     ))
+}
+
+fn get_protocol(chars: &mut Chars) -> Result<String, ParseError> {
+    let mut protocol = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            '(' => {
+                if protocol.len() == 0 {
+                    return Err(ParseError::MissingProtocol);
+                }
+                break;
+            }
+            _ => protocol.push(c),
+        }
+    }
+    Ok(protocol)
+}
+
+fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
+    let mut address = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            ')' => {
+                if address.len() == 0 {
+                    return Err(ParseError::MissingAddress);
+                }
+                break;
+            }
+            _ => address.push(c),
+        }
+    }
+    Ok(address)
 }
 
 fn get_host_port_socket(chars: &mut Chars) -> Result<(String, String, String), ParseError> {
@@ -194,11 +235,13 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        let dsn = parse(r#"mysql://user:o%3Ao@host/database"#).unwrap();
+        let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
         println!("{:?}", dsn);
         assert_eq!(dsn.driver, "mysql");
         assert_eq!(dsn.username, "user");
         assert_eq!(dsn.password.unwrap(), "o:o");
+        assert_eq!(dsn.protocol, "tcp");
+        assert_eq!(dsn.address, "localhost:3306");
         assert_eq!(dsn.host, "host");
         assert_eq!(dsn.port.unwrap(), 3306);
         assert_eq!(dsn.database, None);
@@ -208,8 +251,8 @@ mod tests {
     /*
     #[test]
     fn test_parse_password() {
-        let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
-        assert_eq!(dsn.password, r#"pas':"'sword44444"#);
+    let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
+    assert_eq!(dsn.password, r#"pas':"'sword44444"#);
     }
     */
 }
