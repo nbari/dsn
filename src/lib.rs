@@ -112,6 +112,17 @@ fn get_driver(chars: &mut Chars) -> Result<String, ParseError> {
     Ok(driver)
 }
 
+/// Example:
+///
+///```
+///use dsn::parse;
+///
+///fn main() {
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///    assert_eq!(dsn.username, "user");
+///    assert_eq!(dsn.password.unwrap(), "o:o");
+/// }
+///```
 fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseError> {
     let mut username = String::new();
     let mut password = String::new();
@@ -152,6 +163,16 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
     ))
 }
 
+/// Example:
+///
+///```
+///use dsn::parse;
+///
+///fn main() {
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///    assert_eq!(dsn.protocol, "tcp");
+/// }
+///```
 fn get_protocol(chars: &mut Chars) -> Result<String, ParseError> {
     let mut protocol = String::new();
     while let Some(c) = chars.next() {
@@ -168,6 +189,16 @@ fn get_protocol(chars: &mut Chars) -> Result<String, ParseError> {
     Ok(protocol)
 }
 
+/// Example:
+///
+///```
+///use dsn::parse;
+///
+///fn main() {
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///    assert_eq!(dsn.address, "localhost:3306");
+/// }
+///```
 fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
     let mut address = String::new();
     while let Some(c) = chars.next() {
