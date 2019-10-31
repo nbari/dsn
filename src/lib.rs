@@ -5,6 +5,7 @@ use std::{collections::HashMap, error::Error, fmt, str::Chars};
 pub enum ParseError {
     InvalidPort,
     InvalidDriver,
+    InvalidSocket,
     MissingUsername,
     MissingProtocol,
     MissingAddress,
@@ -23,6 +24,7 @@ impl Error for ParseError {
         match *self {
             ParseError::InvalidPort => "invalid port number",
             ParseError::InvalidDriver => "invalid driver",
+            ParseError::InvalidSocket => "invalid socket",
             ParseError::MissingUsername => "missing username",
             ParseError::MissingProtocol => "missing protocol",
             ParseError::MissingAddress => "missing address",
@@ -72,18 +74,22 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     // address) <host:port|/path/to/socket>
     dsn.address = get_address(chars)?;
 
-    //let (host, port, socket) = get_address(chars)?;
-    //dsn.host = host;
-    //dsn.socket = Some(socket);
+    if dsn.protocol == "unix" {
+        if !dsn.address.starts_with("/") {
+            return Err(ParseError::InvalidSocket);
+        }
+        dsn.socket = Some(dsn.address.clone())
+    } else {
+        let (host, port) = get_host_port(dsn.address.clone())?;
+        dsn.host = host;
 
-    //if port.len() > 0 {
-    //dsn.port = match port.parse::<u16>() {
-    //Ok(n) => Some(n),
-    //Err(_) => return Err(ParseError::InvalidPort),
-    //}
-    //} else if dsn.host != "unix" {
-    //dsn.port = get_default_port(dsn.driver.as_str());
-    //}
+        if port.len() > 0 {
+            dsn.port = match port.parse::<u16>() {
+                Ok(n) => Some(n),
+                Err(_) => return Err(ParseError::InvalidPort),
+            }
+        }
+    }
 
     Ok(dsn)
 }
@@ -215,21 +221,27 @@ fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
     Ok(address)
 }
 
-fn get_host_port_socket(chars: &mut Chars) -> Result<(String, String, String), ParseError> {
+/// Example:
+///
+///```
+///use dsn::parse;
+///
+///fn main() {
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///    assert_eq!(dsn.host, "localhost");
+///    assert_eq!(dsn.port.unwrap(), 3306);
+/// }
+///```
+fn get_host_port(address: String) -> Result<(String, String), ParseError> {
     let mut host = String::new();
-    let mut port = String::new();
-    let mut socket = String::new();
-    let mut defined_port = false;
+    let mut chars = address.chars();
 
     // host
     while let Some(c) = chars.next() {
         match c {
-            ':' | '/' => {
+            ':' => {
                 if host.len() == 0 {
                     return Err(ParseError::MissingHost);
-                }
-                if c == '/' {
-                    defined_port = false;
                 }
                 break;
             }
@@ -237,63 +249,34 @@ fn get_host_port_socket(chars: &mut Chars) -> Result<(String, String, String), P
         }
     }
 
-    if defined_port {
-        // port or socket
-        while let Some(c) = chars.next() {
-            match c {
-                '/' => {
-                    if host == "unix" && socket.len() == 0 {
-                        return Err(ParseError::MissingSocket);
-                    }
-                    break;
-                }
-                _ => {
-                    if host == "unix" {
-                        socket.push(c);
-                    } else {
-                        port.push(c);
-                    }
-                }
-            }
-        }
-    }
+    // port
+    let port = chars.as_str();
 
-    Ok((host, port, socket))
-}
-
-pub fn get_default_port(scheme: &str) -> Option<u16> {
-    match scheme {
-        "mysql" => Some(3306),
-        "pgsql" => Some(5432),
-        "redis" => Some(6379),
-        _ => None,
-    }
+    Ok((host, port.into()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    //#[test]
-    //fn test_parse() {
-    //let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-    //println!("{:?}", dsn);
-    //assert_eq!(dsn.driver, "mysql");
-    //assert_eq!(dsn.username, "user");
-    //assert_eq!(dsn.password.unwrap(), "o:o");
-    //assert_eq!(dsn.protocol, "tcp");
-    //assert_eq!(dsn.address, "localhost:3306");
-    //assert_eq!(dsn.host, "host");
-    //assert_eq!(dsn.port.unwrap(), 3306);
-    //assert_eq!(dsn.database, None);
-    //assert_eq!(dsn.socket.unwrap(), "");
-    //}
+    #[test]
+    fn test_parse() {
+        let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+        println!("{:?}", dsn);
+        assert_eq!(dsn.driver, "mysql");
+        assert_eq!(dsn.username, "user");
+        assert_eq!(dsn.password.unwrap(), "o:o");
+        assert_eq!(dsn.protocol, "tcp");
+        assert_eq!(dsn.address, "localhost:3306");
+        assert_eq!(dsn.host, "localhost");
+        assert_eq!(dsn.port.unwrap(), 3306);
+        assert_eq!(dsn.database, None);
+        assert_eq!(dsn.socket, None);
+    }
 
-    /*
     #[test]
     fn test_parse_password() {
-    let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
-    assert_eq!(dsn.password, r#"pas':"'sword44444"#);
+        let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
+        assert_eq!(dsn.password.unwrap(), r#"pas':"'sword44444"#);
     }
-    */
 }
