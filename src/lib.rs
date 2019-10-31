@@ -1,15 +1,47 @@
+//! DSN (Data Source Name) parser
+//!
+//! [![crates.io](https://img.shields.io/crates/v/dsn.svg)](https://crates.io/crates/dsn)
+//! [![Build Status](https://travis-ci.org/nbari/dsn.svg?branch=master)](https://travis-ci.org/nbari/dsn)
+//!
+//!
+//! DSN format:
+//!```text
+//!<driver>://<username>:<password>@<protocol>(<address>)/<database>?param1=value1&...&paramN=valueN
+//!```
+//!
+//! A DSN in its fullest form:
+//!
+//!```text
+//!driver://username:password@protocol(address)/dbname?param=value
+//!```
+//! For protocol `TCP/UDP` address have the form `host:port`.
+//!
+//! For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket.
+//!
+//! Connect to database on a non standard port:
+//!
+//!```text
+//!pgsql://user:pass@tcp(localhost:5555)/dbname
+//!```
+//!
+//! When using a Unix domain socket:
+//!
+//!```text
+//!mysql://user@unix(/path/to/socket)/database
+//!```
+
 use percent_encoding::percent_decode;
 use std::{collections::HashMap, error::Error, fmt, str::Chars};
 
 #[derive(Debug)]
 pub enum ParseError {
-    InvalidPort,
     InvalidDriver,
+    InvalidPort,
+    InvalidProtocol,
     InvalidSocket,
-    MissingUsername,
-    MissingProtocol,
     MissingAddress,
     MissingHost,
+    MissingProtocol,
     MissingSocket,
 }
 
@@ -22,13 +54,13 @@ impl fmt::Display for ParseError {
 impl Error for ParseError {
     fn description(&self) -> &str {
         match *self {
-            ParseError::InvalidPort => "invalid port number",
             ParseError::InvalidDriver => "invalid driver",
+            ParseError::InvalidPort => "invalid port number",
+            ParseError::InvalidProtocol => "invalid protocol",
             ParseError::InvalidSocket => "invalid socket",
-            ParseError::MissingUsername => "missing username",
-            ParseError::MissingProtocol => "missing protocol",
             ParseError::MissingAddress => "missing address",
             ParseError::MissingHost => "missing host",
+            ParseError::MissingProtocol => "missing protocol",
             ParseError::MissingSocket => "missing unix domain socket",
         }
     }
@@ -38,17 +70,37 @@ impl Error for ParseError {
 #[derive(Debug, Default)]
 pub struct DSN {
     pub driver: String,
-    pub username: String,
+    pub username: Option<String>,
     pub password: Option<String>,
     pub protocol: String,
     pub address: String,
-    pub host: String,
+    pub host: Option<String>,
     pub port: Option<u16>,
     pub database: Option<String>,
     pub socket: Option<String>,
     pub params: HashMap<String, String>,
 }
 
+/// Parse DSN
+///
+/// Example:
+///
+///```
+///use dsn::parse;
+///
+///fn main() {
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///    assert_eq!(dsn.driver, "mysql");
+///    assert_eq!(dsn.username.unwrap(), "user");
+///    assert_eq!(dsn.password.unwrap(), "o:o");
+///    assert_eq!(dsn.protocol, "tcp");
+///    assert_eq!(dsn.address, "localhost:3306");
+///    assert_eq!(dsn.host.unwrap(), "localhost");
+///    assert_eq!(dsn.port.unwrap(), 3306);
+///    assert_eq!(dsn.database.unwrap(), "database");
+///    assert_eq!(dsn.socket, None);
+///}
+///```
 pub fn parse(input: &str) -> Result<DSN, ParseError> {
     // create an empty DSN
     let mut dsn = DSN::default();
@@ -61,7 +113,11 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
 
     // <username>:<password>@
     let (user, pass) = get_username_password(chars)?;
-    dsn.username = user;
+    if user.len() > 0 {
+        dsn.username = Some(user);
+    } else {
+        dsn.username = None;
+    }
     if pass.len() > 0 {
         dsn.password = Some(pass);
     } else {
@@ -79,9 +135,9 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
             return Err(ParseError::InvalidSocket);
         }
         dsn.socket = Some(dsn.address.clone())
-    } else {
+    } else if dsn.protocol == "tcp" {
         let (host, port) = get_host_port(dsn.address.clone())?;
-        dsn.host = host;
+        dsn.host = Some(host);
 
         if port.len() > 0 {
             dsn.port = match port.parse::<u16>() {
@@ -89,6 +145,14 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
                 Err(_) => return Err(ParseError::InvalidPort),
             }
         }
+    }
+
+    // /<database>?
+    let database = get_database(chars)?;
+    if database.len() > 0 {
+        dsn.database = Some(database);
+    } else {
+        dsn.database = None;
     }
 
     Ok(dsn)
@@ -125,48 +189,48 @@ fn get_driver(chars: &mut Chars) -> Result<String, ParseError> {
 ///
 ///fn main() {
 ///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.username, "user");
+///    assert_eq!(dsn.username.unwrap(), "user");
 ///    assert_eq!(dsn.password.unwrap(), "o:o");
 /// }
 ///```
 fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseError> {
     let mut username = String::new();
     let mut password = String::new();
+    let mut has_password = true;
+
     // username
     while let Some(c) = chars.next() {
         match c {
             '@' => {
-                if username.len() == 0 {
-                    return Err(ParseError::MissingUsername);
-                }
+                has_password = false;
                 break;
             }
             ':' => {
-                if username.len() == 0 {
-                    return Err(ParseError::MissingUsername);
-                }
                 break;
             }
             _ => username.push(c),
         }
     }
+
+    username = percent_decode(username.as_bytes())
+        .decode_utf8()
+        .unwrap()
+        .into();
+
     // password
-    while let Some(c) = chars.next() {
-        match c {
-            '@' => break,
-            _ => password.push(c),
+    if has_password {
+        while let Some(c) = chars.next() {
+            match c {
+                '@' => break,
+                _ => password.push(c),
+            }
         }
+        password = percent_decode(password.as_bytes())
+            .decode_utf8()
+            .unwrap()
+            .into();
     }
-    Ok((
-        percent_decode(username.as_bytes())
-            .decode_utf8()
-            .unwrap()
-            .into(),
-        percent_decode(password.as_bytes())
-            .decode_utf8()
-            .unwrap()
-            .into(),
-    ))
+    Ok((username, password))
 }
 
 /// Example:
@@ -228,7 +292,7 @@ fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
 ///
 ///fn main() {
 ///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.host, "localhost");
+///    assert_eq!(dsn.host.unwrap(), "localhost");
 ///    assert_eq!(dsn.port.unwrap(), 3306);
 /// }
 ///```
@@ -255,24 +319,35 @@ fn get_host_port(address: String) -> Result<(String, String), ParseError> {
     Ok((host, port.into()))
 }
 
+/// Example:
+///
+///```
+///use dsn::parse;
+///
+///fn main() {
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///    assert_eq!(dsn.database.unwrap(), "database");
+/// }
+///```
+fn get_database(chars: &mut Chars) -> Result<String, ParseError> {
+    let mut database = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            '/' => {
+                if database.len() == 0 {
+                    continue;
+                }
+            }
+            '?' => break,
+            _ => database.push(c),
+        }
+    }
+    Ok(database)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_parse() {
-        let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-        println!("{:?}", dsn);
-        assert_eq!(dsn.driver, "mysql");
-        assert_eq!(dsn.username, "user");
-        assert_eq!(dsn.password.unwrap(), "o:o");
-        assert_eq!(dsn.protocol, "tcp");
-        assert_eq!(dsn.address, "localhost:3306");
-        assert_eq!(dsn.host, "localhost");
-        assert_eq!(dsn.port.unwrap(), 3306);
-        assert_eq!(dsn.database, None);
-        assert_eq!(dsn.socket, None);
-    }
 
     #[test]
     fn test_parse_password() {
