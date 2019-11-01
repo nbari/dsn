@@ -94,7 +94,7 @@ pub struct DSN {
 ///use dsn::parse;
 ///
 ///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?charset=utf8"#).unwrap();
 ///    assert_eq!(dsn.driver, "mysql");
 ///    assert_eq!(dsn.username.unwrap(), "user");
 ///    assert_eq!(dsn.password.unwrap(), "o:o");
@@ -104,6 +104,8 @@ pub struct DSN {
 ///    assert_eq!(dsn.port.unwrap(), 3306);
 ///    assert_eq!(dsn.database.unwrap(), "database");
 ///    assert_eq!(dsn.socket, None);
+///    assert!(!dsn.params.is_empty());
+///    assert_eq!(dsn.params.get("charset").unwrap(), ("utf8"));
 ///}
 ///```
 pub fn parse(input: &str) -> Result<DSN, ParseError> {
