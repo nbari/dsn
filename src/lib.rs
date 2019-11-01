@@ -1,41 +1,44 @@
-//! DSN (Data Source Name) parser
+//!DSN (Data Source Name) parser
 //!
-//! [![crates.io](https://img.shields.io/crates/v/dsn.svg)](https://crates.io/crates/dsn)
-//! [![Build Status](https://travis-ci.org/nbari/dsn.svg?branch=master)](https://travis-ci.org/nbari/dsn)
-//!
-//!
-//! DSN format:
+//!DSN format:
 //!```text
 //!<driver>://<username>:<password>@<protocol>(<address>)/<database>?param1=value1&...&paramN=valueN
 //!```
 //!
-//! A DSN in its fullest form:
+//!A DSN in its fullest form:
 //!
 //!```text
 //!driver://username:password@protocol(address)/dbname?param=value
 //!```
-//! For protocol `TCP/UDP` address have the form `host:port`.
 //!
-//! For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket.
+//!The address changes depending on the protocol
 //!
-//! Connect to database on a non standard port:
+//!For `TCP/UDP` address have the form `host:port`, example:
 //!
 //!```text
 //!pgsql://user:pass@tcp(localhost:5555)/dbname
 //!```
 //!
-//! When using a Unix domain socket:
+//!For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket, for example:
 //!
 //!```text
 //!mysql://user@unix(/path/to/socket)/database
 //!```
+//!
+//!For protocol `file` (sqlite) use the absolute path as the address, example:
+//!
+//!```text
+//!sqlite://@file(/full/unix/path/to/file.db)
+//!```
 
 use percent_encoding::percent_decode;
-use std::{collections::HashMap, error::Error, fmt, str::Chars};
+use std::{collections::BTreeMap, error::Error, fmt, str::Chars};
 
 #[derive(Debug)]
 pub enum ParseError {
     InvalidDriver,
+    InvalidParams,
+    InvalidPath,
     InvalidPort,
     InvalidProtocol,
     InvalidSocket,
@@ -55,6 +58,8 @@ impl Error for ParseError {
     fn description(&self) -> &str {
         match *self {
             ParseError::InvalidDriver => "invalid driver",
+            ParseError::InvalidParams => "invalid params",
+            ParseError::InvalidPath => "invalid absolute path",
             ParseError::InvalidPort => "invalid port number",
             ParseError::InvalidProtocol => "invalid protocol",
             ParseError::InvalidSocket => "invalid socket",
@@ -78,7 +83,7 @@ pub struct DSN {
     pub port: Option<u16>,
     pub database: Option<String>,
     pub socket: Option<String>,
-    pub params: HashMap<String, String>,
+    pub params: BTreeMap<String, String>,
 }
 
 /// Parse DSN
@@ -115,13 +120,9 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     let (user, pass) = get_username_password(chars)?;
     if user.len() > 0 {
         dsn.username = Some(user);
-    } else {
-        dsn.username = None;
     }
     if pass.len() > 0 {
         dsn.password = Some(pass);
-    } else {
-        dsn.password = None;
     }
 
     // protocol(
@@ -130,19 +131,27 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     // address) <host:port|/path/to/socket>
     dsn.address = get_address(chars)?;
 
-    if dsn.protocol == "unix" {
-        if !dsn.address.starts_with("/") {
-            return Err(ParseError::InvalidSocket);
+    match dsn.protocol.as_ref() {
+        "unix" => {
+            if !dsn.address.starts_with("/") {
+                return Err(ParseError::InvalidSocket);
+            }
+            dsn.socket = Some(dsn.address.clone())
         }
-        dsn.socket = Some(dsn.address.clone())
-    } else if dsn.protocol == "tcp" {
-        let (host, port) = get_host_port(dsn.address.clone())?;
-        dsn.host = Some(host);
+        "file" => {
+            if !dsn.address.starts_with("/") {
+                return Err(ParseError::InvalidPath);
+            }
+        }
+        _ => {
+            let (host, port) = get_host_port(dsn.address.clone())?;
+            dsn.host = Some(host);
 
-        if port.len() > 0 {
-            dsn.port = match port.parse::<u16>() {
-                Ok(n) => Some(n),
-                Err(_) => return Err(ParseError::InvalidPort),
+            if port.len() > 0 {
+                dsn.port = match port.parse::<u16>() {
+                    Ok(n) => Some(n),
+                    Err(_) => return Err(ParseError::InvalidPort),
+                }
             }
         }
     }
@@ -151,8 +160,11 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     let database = get_database(chars)?;
     if database.len() > 0 {
         dsn.database = Some(database);
-    } else {
-        dsn.database = None;
+    }
+
+    let params = chars.as_str();
+    if params.len() > 0 {
+        dsn.params = get_params(chars.as_str())?;
     }
 
     Ok(dsn)
@@ -343,6 +355,33 @@ fn get_database(chars: &mut Chars) -> Result<String, ParseError> {
         }
     }
     Ok(database)
+}
+
+/// Example:
+///
+///```
+///use dsn::parse;
+///
+///fn main() {
+///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?param1=value1&param2=value2"#).unwrap();
+///    assert!(!dsn.params.is_empty());
+///    assert_eq!(dsn.params.get("param1"), Some(&String::from("value1")));
+///    assert_eq!(dsn.params.get("param2").unwrap(), "value2");
+///    assert_eq!(dsn.params.get("param3"), None);
+/// }
+///```
+fn get_params(params_string: &str) -> Result<BTreeMap<String, String>, ParseError> {
+    let params: BTreeMap<String, String> = params_string
+        .split('&')
+        .map(|kv| kv.split('=').collect::<Vec<&str>>())
+        .map(|vec| {
+            if vec.len() != 2 {
+                return Err(ParseError::InvalidParams);
+            }
+            Ok((vec[0].to_string(), vec[1].to_string()))
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(params)
 }
 
 #[cfg(test)]

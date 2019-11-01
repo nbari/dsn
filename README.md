@@ -12,14 +12,16 @@ A DSN in its fullest form:
 
     driver://username:password@protocol(address)/dbname?param=value
 
-For protocol `TCP/UDP` address have the form `host:port`.
+The address changes depending on the protocol
 
-For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket.
-
-Connect to database on a non standard port:
+For `TCP/UDP` address have the form `host:port`, example:
 
     pgsql://user:pass@tcp(localhost:5555)/dbname
 
-When using a Unix domain socket:
+For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket, for example:
 
     mysql://user@unix(/path/to/socket)/database
+
+For protocol `file` (sqlite) use the absolute path as the address, example:
+
+    sqlite://@file(/full/unix/path/to/file.db)
