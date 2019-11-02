@@ -25,3 +25,26 @@ For protocol `unix` (Unix domain sockets) the address is the absolute path to th
 For protocol `file` (sqlite) use the absolute path as the address, example:
 
     sqlite://@file(/full/unix/path/to/file.db)
+
+# percent-encode
+
+Percent-encode username and password with characters like `@`, for example if password is:
+
+    !A4T@hh'cUj7LXXvk"
+
+From the command line you can encode it with:
+
+    echo -n "\!A4T@hh'cUj7LXXvk\"" | jq -s -R -r @uri
+
+or
+
+    echo -n "\!A4T@hh'cUj7LXXvk\"" | xxd -p |sed 's/../%&/g'
+
+Then you can build the dsn:
+
+
+    mysql://root:!A4T%40hh'cUj7LXXvk%22@tcp(10.0.0.1:3306)/test
+
+or
+
+    mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test

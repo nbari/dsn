@@ -30,7 +30,37 @@
 //!```text
 //!sqlite://@file(/full/unix/path/to/file.db)
 //!```
-
+//!# percent-encode
+//!
+//!Percent-encode username and password with characters like `@`, for example if password is:
+//!
+//!```text
+//!sop@s
+//!
+//!!A4T@hh'cUj7LXXvk"
+//!```
+//!
+//!From the command line you can encode it with:
+//!
+//!```text
+//!echo -n "sop@s" | jq -s -R -r @uri
+//!```
+//!or
+//!
+//!```text
+//!echo -n "\!A4T@hh'cUj7LXXvk\"" | xxd -p |sed 's/../%&/g'
+//!```
+//!
+//!Then you can build the dsn:
+//!
+//!```text
+//!mysql://root:sop%40s@tcp(10.0.0.1:3306)/test
+//!```
+//!or
+//!
+//!```text
+//!mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test
+//!```
 use percent_encoding::percent_decode;
 use std::{collections::BTreeMap, error::Error, fmt, str::Chars};
 

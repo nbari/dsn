@@ -78,3 +78,39 @@ fn test_parse_driver5() {
     assert_eq!(dsn.params.get("charset").unwrap(), "utf8");
     assert_eq!(dsn.params.get("tls").unwrap(), "false");
 }
+
+#[test]
+// empty params
+fn password_decode1() {
+    // echo -n "\!A4T@hh'cUj7LXXvk\"" | xxd -p |sed 's/../%&/g'
+    let dsn = parse(r#"mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test"#).unwrap();
+    println!("{:#?}", dsn);
+    assert_eq!(dsn.driver, "mysql");
+    assert_eq!(dsn.username.unwrap(), "root");
+    assert_eq!(dsn.password.unwrap(), r#"!A4T@hh'cUj7LXXvk""#);
+    assert_eq!(dsn.protocol, "tcp");
+    assert_eq!(dsn.address, "10.0.0.1:3306");
+    assert_eq!(dsn.host.unwrap(), "10.0.0.1");
+    assert_eq!(dsn.port.unwrap(), 3306);
+    assert_eq!(dsn.database.unwrap(), "test");
+    assert_eq!(dsn.socket, None);
+    assert!(dsn.params.is_empty());
+}
+
+#[test]
+// empty params
+fn password_decode2() {
+    // echo -n "\!A4T@hh'cUj7LXXvk\"" | jq -s -R -r @uri
+    let dsn = parse(r#"mysql://root:!A4T%40hh'cUj7LXXvk%22@tcp(10.0.0.1:3306)/test"#).unwrap();
+    println!("{:#?}", dsn);
+    assert_eq!(dsn.driver, "mysql");
+    assert_eq!(dsn.username.unwrap(), "root");
+    assert_eq!(dsn.password.unwrap(), r#"!A4T@hh'cUj7LXXvk""#);
+    assert_eq!(dsn.protocol, "tcp");
+    assert_eq!(dsn.address, "10.0.0.1:3306");
+    assert_eq!(dsn.host.unwrap(), "10.0.0.1");
+    assert_eq!(dsn.port.unwrap(), 3306);
+    assert_eq!(dsn.database.unwrap(), "test");
+    assert_eq!(dsn.socket, None);
+    assert!(dsn.params.is_empty());
+}
