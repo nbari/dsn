@@ -150,10 +150,10 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
 
     // <username>:<password>@
     let (user, pass) = get_username_password(chars)?;
-    if user.len() > 0 {
+    if !user.is_empty() {
         dsn.username = Some(user);
     }
-    if pass.len() > 0 {
+    if !pass.is_empty() {
         dsn.password = Some(pass);
     }
 
@@ -165,13 +165,13 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
 
     match dsn.protocol.as_ref() {
         "unix" => {
-            if !dsn.address.starts_with("/") {
+            if !dsn.address.starts_with('/') {
                 return Err(ParseError::InvalidSocket);
             }
             dsn.socket = Some(dsn.address.clone())
         }
         "file" => {
-            if !dsn.address.starts_with("/") {
+            if !dsn.address.starts_with('/') {
                 return Err(ParseError::InvalidPath);
             }
         }
@@ -179,7 +179,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
             let (host, port) = get_host_port(dsn.address.clone())?;
             dsn.host = Some(host);
 
-            if port.len() > 0 {
+            if !port.is_empty() {
                 dsn.port = match port.parse::<u16>() {
                     Ok(n) => Some(n),
                     Err(_) => return Err(ParseError::InvalidPort),
@@ -190,12 +190,12 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
 
     // /<database>?
     let database = get_database(chars)?;
-    if database.len() > 0 {
+    if !database.is_empty() {
         dsn.database = Some(database);
     }
 
     let params = chars.as_str();
-    if params.len() > 0 {
+    if !params.is_empty() {
         dsn.params = get_params(chars.as_str())?;
     }
 
@@ -263,7 +263,7 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
 
     // password
     if has_password {
-        while let Some(c) = chars.next() {
+        for c in chars {
             match c {
                 '@' => break,
                 _ => password.push(c),
@@ -289,10 +289,10 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
 ///```
 fn get_protocol(chars: &mut Chars) -> Result<String, ParseError> {
     let mut protocol = String::new();
-    while let Some(c) = chars.next() {
+    for c in chars {
         match c {
             '(' => {
-                if protocol.len() == 0 {
+                if protocol.is_empty() {
                     return Err(ParseError::MissingProtocol);
                 }
                 break;
@@ -315,10 +315,10 @@ fn get_protocol(chars: &mut Chars) -> Result<String, ParseError> {
 ///```
 fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
     let mut address = String::new();
-    while let Some(c) = chars.next() {
+    for c in chars {
         match c {
             ')' => {
-                if address.len() == 0 {
+                if address.is_empty() {
                     return Err(ParseError::MissingAddress);
                 }
                 break;
@@ -348,7 +348,7 @@ fn get_host_port(address: String) -> Result<(String, String), ParseError> {
     while let Some(c) = chars.next() {
         match c {
             ':' => {
-                if host.len() == 0 {
+                if host.is_empty() {
                     return Err(ParseError::MissingHost);
                 }
                 break;
@@ -375,10 +375,10 @@ fn get_host_port(address: String) -> Result<(String, String), ParseError> {
 ///```
 fn get_database(chars: &mut Chars) -> Result<String, ParseError> {
     let mut database = String::new();
-    while let Some(c) = chars.next() {
+    for c in chars {
         match c {
             '/' => {
-                if database.len() == 0 {
+                if database.is_empty() {
                     continue;
                 }
             }
