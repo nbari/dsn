@@ -79,29 +79,25 @@ pub enum ParseError {
 }
 
 impl fmt::Display for ParseError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        self.description().fmt(fmt)
-    }
-}
-
-impl Error for ParseError {
-    fn description(&self) -> &str {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ParseError::InvalidDriver => "invalid driver",
-            ParseError::InvalidParams => "invalid params",
-            ParseError::InvalidPath => "invalid absolute path",
-            ParseError::InvalidPort => "invalid port number",
-            ParseError::InvalidProtocol => "invalid protocol",
-            ParseError::InvalidSocket => "invalid socket",
-            ParseError::MissingAddress => "missing address",
-            ParseError::MissingHost => "missing host",
-            ParseError::MissingProtocol => "missing protocol",
-            ParseError::MissingSocket => "missing unix domain socket",
+            Self::InvalidDriver => write!(f, "invalid driver"),
+            Self::InvalidParams => write!(f, "invalid params"),
+            Self::InvalidPath => write!(f, "invalid absolute path"),
+            Self::InvalidPort => write!(f, "invalid port number"),
+            Self::InvalidProtocol => write!(f, "invalid protocol"),
+            Self::InvalidSocket => write!(f, "invalid socket"),
+            Self::MissingAddress => write!(f, "missing address"),
+            Self::MissingHost => write!(f, "missing host"),
+            Self::MissingProtocol => write!(f, "missing protocol"),
+            Self::MissingSocket => write!(f, "missing unix domain socket"),
         }
     }
 }
 
-/// driver://username:password@protocol(address)/dbname?param=value
+impl Error for ParseError {}
+
+/// DSN format: `driver://username:password@protocol(address)/dbname?param=value`
 #[derive(Debug, Default)]
 pub struct DSN {
     pub driver: String,
@@ -176,7 +172,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
             }
         }
         _ => {
-            let (host, port) = get_host_port(dsn.address.clone())?;
+            let (host, port) = get_host_port(&dsn.address)?;
             dsn.host = Some(host);
 
             if !port.is_empty() {
@@ -340,7 +336,7 @@ fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
 ///    assert_eq!(dsn.port.unwrap(), 3306);
 /// }
 ///```
-fn get_host_port(address: String) -> Result<(String, String), ParseError> {
+fn get_host_port(address: &str) -> Result<(String, String), ParseError> {
     let mut host = String::new();
     let mut chars = address.chars();
 
