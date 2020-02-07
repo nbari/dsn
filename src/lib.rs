@@ -119,21 +119,21 @@ pub struct DSN {
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?charset=utf8"#).unwrap();
-///    assert_eq!(dsn.driver, "mysql");
-///    assert_eq!(dsn.username.unwrap(), "user");
-///    assert_eq!(dsn.password.unwrap(), "o:o");
-///    assert_eq!(dsn.protocol, "tcp");
-///    assert_eq!(dsn.address, "localhost:3306");
-///    assert_eq!(dsn.host.unwrap(), "localhost");
-///    assert_eq!(dsn.port.unwrap(), 3306);
-///    assert_eq!(dsn.database.unwrap(), "database");
-///    assert_eq!(dsn.socket, None);
-///    assert!(!dsn.params.is_empty());
-///    assert_eq!(dsn.params.get("charset").unwrap(), ("utf8"));
-///}
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?charset=utf8"#).unwrap();
+///assert_eq!(dsn.driver, "mysql");
+///assert_eq!(dsn.username.unwrap(), "user");
+///assert_eq!(dsn.password.unwrap(), "o:o");
+///assert_eq!(dsn.protocol, "tcp");
+///assert_eq!(dsn.address, "localhost:3306");
+///assert_eq!(dsn.host.unwrap(), "localhost");
+///assert_eq!(dsn.port.unwrap(), 3306);
+///assert_eq!(dsn.database.unwrap(), "database");
+///assert_eq!(dsn.socket, None);
+///assert!(!dsn.params.is_empty());
+///assert_eq!(dsn.params.get("charset").unwrap(), ("utf8"));
 ///```
+/// # Errors
+/// [`ParseError`](enum.ParseError.html)
 pub fn parse(input: &str) -> Result<DSN, ParseError> {
     // create an empty DSN
     let mut dsn = DSN::default();
@@ -203,10 +203,8 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.driver, "mysql");
-/// }
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///assert_eq!(dsn.driver, "mysql");
 ///```
 fn get_driver(chars: &mut Chars) -> Result<String, ParseError> {
     let mut driver = String::new();
@@ -227,11 +225,9 @@ fn get_driver(chars: &mut Chars) -> Result<String, ParseError> {
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.username.unwrap(), "user");
-///    assert_eq!(dsn.password.unwrap(), "o:o");
-/// }
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///assert_eq!(dsn.username.unwrap(), "user");
+///assert_eq!(dsn.password.unwrap(), "o:o");
 ///```
 fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseError> {
     let mut username = String::new();
@@ -278,10 +274,8 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.protocol, "tcp");
-/// }
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///assert_eq!(dsn.protocol, "tcp");
 ///```
 fn get_protocol(chars: &mut Chars) -> Result<String, ParseError> {
     let mut protocol = String::new();
@@ -304,10 +298,8 @@ fn get_protocol(chars: &mut Chars) -> Result<String, ParseError> {
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.address, "localhost:3306");
-/// }
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///assert_eq!(dsn.address, "localhost:3306");
 ///```
 fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
     let mut address = String::new();
@@ -330,11 +322,9 @@ fn get_address(chars: &mut Chars) -> Result<String, ParseError> {
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.host.unwrap(), "localhost");
-///    assert_eq!(dsn.port.unwrap(), 3306);
-/// }
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///assert_eq!(dsn.host.unwrap(), "localhost");
+///assert_eq!(dsn.port.unwrap(), 3306);
 ///```
 fn get_host_port(address: &str) -> Result<(String, String), ParseError> {
     let mut host = String::new();
@@ -364,10 +354,8 @@ fn get_host_port(address: &str) -> Result<(String, String), ParseError> {
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
-///    assert_eq!(dsn.database.unwrap(), "database");
-/// }
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
+///assert_eq!(dsn.database.unwrap(), "database");
 ///```
 fn get_database(chars: &mut Chars) -> Result<String, ParseError> {
     let mut database = String::new();
@@ -390,13 +378,11 @@ fn get_database(chars: &mut Chars) -> Result<String, ParseError> {
 ///```
 ///use dsn::parse;
 ///
-///fn main() {
-///    let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?param1=value1&param2=value2"#).unwrap();
-///    assert!(!dsn.params.is_empty());
-///    assert_eq!(dsn.params.get("param1"), Some(&String::from("value1")));
-///    assert_eq!(dsn.params.get("param2").unwrap(), "value2");
-///    assert_eq!(dsn.params.get("param3"), None);
-/// }
+///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?param1=value1&param2=value2"#).unwrap();
+///assert!(!dsn.params.is_empty());
+///assert_eq!(dsn.params.get("param1"), Some(&String::from("value1")));
+///assert_eq!(dsn.params.get("param2").unwrap(), "value2");
+///assert_eq!(dsn.params.get("param3"), None);
 ///```
 fn get_params(params_string: &str) -> Result<BTreeMap<String, String>, ParseError> {
     let params: BTreeMap<String, String> = params_string
