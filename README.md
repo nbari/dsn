@@ -2,6 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/dsn.svg)](https://crates.io/crates/dsn)
 [![Build Status](https://travis-ci.org/nbari/dsn.svg?branch=master)](https://travis-ci.org/nbari/dsn)
+[![docs](https://docs.rs/dsn/badge.svg)](https://docs.rs/dsn)
 
 
 DSN format:
@@ -48,3 +49,28 @@ Then you can build the dsn:
 or
 
     mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test
+
+
+
+# Example using the mysql create [![crates.io](https://img.shields.io/crates/v/mysql.svg)](https://crates.io/crates/mysql)
+
+    // if using clap asking for the DSN as an argument
+    let dsn = matches.value_of("DSN").unwrap();
+    let dsn = dsn::parse(dsn).unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        process::exit(1);
+    });
+
+    let mut opts = mysql::OptsBuilder::new();
+    opts.user(dsn.username);
+    opts.pass(dsn.password);
+    opts.ip_or_hostname(dsn.host);
+    if let Some(port) = dsn.port {
+        opts.tcp_port(port);
+    }
+    opts.socket(dsn.socket);
+    opts.db_name(dsn.database);
+    let pool = mysql::Pool::new_manual(3, 50, opts).unwrap_or_else(|e| {
+        eprintln!("Could not connect to MySQL: {}", e);
+        process::exit(1);
+    });
