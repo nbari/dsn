@@ -70,6 +70,16 @@ or
     }
     opts.socket(dsn.socket);
     opts.db_name(dsn.database);
+
+    // mysql ssl options
+    let mut ssl_opts = mysql::SslOpts::default();
+    if let Some(tls) = dsn.params.get("tls") {
+        if *tls == "skip-verify" {
+            ssl_opts.set_danger_accept_invalid_certs(true);
+        }
+    }
+    opts.ssl_opts(ssl_opts);
+
     let pool = mysql::Pool::new_manual(3, 50, opts).unwrap_or_else(|e| {
         eprintln!("Could not connect to MySQL: {}", e);
         process::exit(1);
