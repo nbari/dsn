@@ -54,6 +54,12 @@ or
 
 # Example using the mysql create [![crates.io](https://img.shields.io/crates/v/mysql.svg)](https://crates.io/crates/mysql)
 
+DSN:
+
+    mysql://user:password@tcp(db.example.com)/mydb?tls=skip-verify
+
+Code:
+
     // if using clap asking for the DSN as an argument
     let dsn = matches.value_of("DSN").unwrap();
     let dsn = dsn::parse(dsn).unwrap_or_else(|e| {

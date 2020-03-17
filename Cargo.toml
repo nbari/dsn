@@ -1,6 +1,6 @@
 [package]
 name = "dsn"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Nicolas Embriz <nbari@tequila.io>"]
 description = "DSN (Data Source Name) parser"
 documentation = "https://docs.rs/dsn/latest/dsn/"
