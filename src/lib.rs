@@ -400,7 +400,7 @@ fn get_params(params_string: &str) -> Result<BTreeMap<String, String>, ParseErro
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::parse;
 
     #[test]
     fn test_parse_password() {
