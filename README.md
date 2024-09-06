@@ -1,7 +1,7 @@
 # DSN (Data Source Name) parser
 
 [![crates.io](https://img.shields.io/crates/v/dsn.svg)](https://crates.io/crates/dsn)
-[![Build Status](https://travis-ci.org/nbari/dsn.svg?branch=master)](https://travis-ci.org/nbari/dsn)
+[![Test & Build](https://github.com/nbari/dsn/actions/workflows/build.yml/badge.svg)](https://github.com/nbari/dsn/actions/workflows/build.yml)
 [![docs](https://docs.rs/dsn/badge.svg)](https://docs.rs/dsn)
 
 
