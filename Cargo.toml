@@ -1,6 +1,6 @@
 [package]
 name = "dsn"
-version = "1.0.2"
+version = "1.1.0"
 authors = ["Nicolas Embriz <nbari@tequila.io>"]
 description = "DSN (Data Source Name) parser"
 documentation = "https://docs.rs/dsn/latest/dsn/"
@@ -10,10 +10,7 @@ readme = "README.md"
 keywords = ["database", "dsn", "parser"]
 categories = ["parsing", "database"]
 license = "BSD-3-Clause"
-edition = "2018"
-
-[badges]
-travis-ci = { repository = "nbari/dsn", branch = "master" }
+edition = "2021"
 
 [dependencies]
-percent-encoding = "2.1.0"
+percent-encoding = "2.3.1"

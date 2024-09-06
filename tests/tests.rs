@@ -114,3 +114,21 @@ fn password_decode2() {
     assert_eq!(dsn.socket, None);
     assert!(dsn.params.is_empty());
 }
+
+#[test]
+fn test_params() {
+    let dsn = parse(r#"postgres://postgres:password@tcp(host.tld:5432)/database?sslmode=require"#)
+        .unwrap();
+    println!("{:#?}", dsn);
+    assert_eq!(dsn.driver, "postgres");
+    assert_eq!(dsn.username.unwrap(), "postgres");
+    assert_eq!(dsn.password.unwrap(), "password");
+    assert_eq!(dsn.protocol, "tcp");
+    assert_eq!(dsn.address, "host.tld:5432");
+    assert_eq!(dsn.host.unwrap(), "host.tld");
+    assert_eq!(dsn.port.unwrap(), 5432);
+    assert_eq!(dsn.database.unwrap(), "database");
+    assert_eq!(dsn.socket, None);
+    assert!(!dsn.params.is_empty());
+    assert_eq!(dsn.params.get("sslmode").unwrap(), "require");
+}

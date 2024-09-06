@@ -61,6 +61,7 @@
 //!```text
 //!mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test
 //!```
+use core::str::Utf8Error;
 use percent_encoding::percent_decode;
 use std::{collections::BTreeMap, error::Error, fmt, str::Chars};
 
@@ -76,6 +77,13 @@ pub enum ParseError {
     MissingHost,
     MissingProtocol,
     MissingSocket,
+    Utf8Error(Utf8Error),
+}
+
+impl From<Utf8Error> for ParseError {
+    fn from(err: Utf8Error) -> Self {
+        Self::Utf8Error(err)
+    }
 }
 
 impl fmt::Display for ParseError {
@@ -91,6 +99,7 @@ impl fmt::Display for ParseError {
             Self::MissingHost => write!(f, "missing host"),
             Self::MissingProtocol => write!(f, "missing protocol"),
             Self::MissingSocket => write!(f, "missing unix domain socket"),
+            Self::Utf8Error(ref err) => write!(f, "UTF-8 error: {err}"),
         }
     }
 }
@@ -164,7 +173,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
             if !dsn.address.starts_with('/') {
                 return Err(ParseError::InvalidSocket);
             }
-            dsn.socket = Some(dsn.address.clone())
+            dsn.socket = Some(dsn.address.clone());
         }
         "file" => {
             if !dsn.address.starts_with('/') {
@@ -185,7 +194,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     }
 
     // /<database>?
-    let database = get_database(chars)?;
+    let database = get_database(chars);
     if !database.is_empty() {
         dsn.database = Some(database);
     }
@@ -235,7 +244,7 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
     let mut has_password = true;
 
     // username
-    while let Some(c) = chars.next() {
+    for c in chars.by_ref() {
         match c {
             '@' => {
                 has_password = false;
@@ -248,10 +257,7 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
         }
     }
 
-    username = percent_decode(username.as_bytes())
-        .decode_utf8()
-        .unwrap()
-        .into();
+    username = percent_decode(username.as_bytes()).decode_utf8()?.into();
 
     // password
     if has_password {
@@ -261,11 +267,9 @@ fn get_username_password(chars: &mut Chars) -> Result<(String, String), ParseErr
                 _ => password.push(c),
             }
         }
-        password = percent_decode(password.as_bytes())
-            .decode_utf8()
-            .unwrap()
-            .into();
+        password = percent_decode(password.as_bytes()).decode_utf8()?.into();
     }
+
     Ok((username, password))
 }
 
@@ -331,7 +335,7 @@ fn get_host_port(address: &str) -> Result<(String, String), ParseError> {
     let mut chars = address.chars();
 
     // host
-    while let Some(c) = chars.next() {
+    for c in chars.by_ref() {
         match c {
             ':' => {
                 if host.is_empty() {
@@ -357,7 +361,7 @@ fn get_host_port(address: &str) -> Result<(String, String), ParseError> {
 ///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database"#).unwrap();
 ///assert_eq!(dsn.database.unwrap(), "database");
 ///```
-fn get_database(chars: &mut Chars) -> Result<String, ParseError> {
+fn get_database(chars: &mut Chars) -> String {
     let mut database = String::new();
     for c in chars {
         match c {
@@ -370,7 +374,7 @@ fn get_database(chars: &mut Chars) -> Result<String, ParseError> {
             _ => database.push(c),
         }
     }
-    Ok(database)
+    database
 }
 
 /// Example:
