@@ -17,7 +17,7 @@ The address changes depending on the protocol
 
 For `TCP/UDP` address have the form `host:port`, example:
 
-    pgsql://user:pass@tcp(localhost:5555)/dbname
+    postgresql://user:pass@tcp(localhost:5432)/dbname
 
 For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket, for example:
 
@@ -49,7 +49,6 @@ Then you can build the dsn:
 or
 
     mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test
-
 
 
 # Example using the mysql create [![crates.io](https://img.shields.io/crates/v/mysql.svg)](https://crates.io/crates/mysql)

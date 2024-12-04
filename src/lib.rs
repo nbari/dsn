@@ -16,7 +16,7 @@
 //!For `TCP/UDP` address have the form `host:port`, example:
 //!
 //!```text
-//!pgsql://user:pass@tcp(localhost:5555)/dbname
+//!postgresql://user:pass@tcp(localhost:5432)/dbname
 //!```
 //!
 //!For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket, for example:
@@ -147,7 +147,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     // create an empty DSN
     let mut dsn = DSN::default();
 
-    // create an interator for input
+    // create an iterator for input
     let chars = &mut input.chars();
 
     // <driver>://
@@ -410,5 +410,47 @@ mod tests {
     fn test_parse_password() {
         let dsn = parse(r#"mysql://user:pas':"'sword44444@host:port/database"#).unwrap();
         assert_eq!(dsn.password.unwrap(), r#"pas':"'sword44444"#);
+    }
+
+    #[test]
+    fn test_parse_driver() {
+        let dsn = parse(r#"mysql://user:pass@host:port/database"#).unwrap();
+        assert_eq!(dsn.driver, "mysql");
+    }
+
+    #[test]
+    fn test_parse_driver_postgres() {
+        let dsn = parse(r#"postgres://user:pass@host:port/database"#).unwrap();
+        assert_eq!(dsn.driver, "postgres");
+    }
+
+    #[test]
+    fn test_parse_username() {
+        let dsn = parse(r#"mysql://user:pass@host:port/database"#).unwrap();
+        assert_eq!(dsn.username.unwrap(), "user");
+    }
+
+    #[test]
+    fn test_parse_protocol() {
+        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        assert_eq!(dsn.protocol, "tcp");
+    }
+
+    #[test]
+    fn test_parse_address() {
+        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        assert_eq!(dsn.address, "host:3306");
+    }
+
+    #[test]
+    fn test_parse_host() {
+        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        assert_eq!(dsn.host.unwrap(), "host");
+    }
+
+    #[test]
+    fn test_parse_port() {
+        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        assert_eq!(dsn.port.unwrap(), 3306);
     }
 }
