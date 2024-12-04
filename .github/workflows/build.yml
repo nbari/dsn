@@ -45,20 +45,5 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build
-        run: |
+        run: |-
           cargo build --release --target ${{ matrix.target }}
-
-  packages:
-    name: package
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - run: cargo publish --token ${CRATES_TOKEN}
-        env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
