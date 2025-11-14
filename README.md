@@ -41,7 +41,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dsn = "1.1"
+dsn = "1.2"
 ```
 
 ## DSN Format
