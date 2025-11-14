@@ -789,7 +789,7 @@ impl DSNBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{DSNBuilder, parse};
+    use super::{DSN, DSNBuilder, ParseError, parse};
 
     #[test]
     fn test_parse_password() {
@@ -973,5 +973,146 @@ mod tests {
 
         assert_eq!(dsn.driver, "mariadb");
         assert_eq!(dsn.port, Some(3306));
+    }
+
+    #[test]
+    fn test_error_display() {
+        // Test all error display messages
+        assert_eq!(format!("{}", ParseError::InvalidDriver), "invalid driver");
+        assert_eq!(format!("{}", ParseError::InvalidParams), "invalid params");
+        assert_eq!(
+            format!("{}", ParseError::InvalidPath),
+            "invalid absolute path"
+        );
+        assert_eq!(
+            format!("{}", ParseError::InvalidPort),
+            "invalid port number"
+        );
+        assert_eq!(
+            format!("{}", ParseError::InvalidProtocol),
+            "invalid protocol"
+        );
+        assert_eq!(format!("{}", ParseError::InvalidSocket), "invalid socket");
+        assert_eq!(format!("{}", ParseError::MissingAddress), "missing address");
+        assert_eq!(format!("{}", ParseError::MissingHost), "missing host");
+        assert_eq!(
+            format!("{}", ParseError::MissingProtocol),
+            "missing protocol"
+        );
+        assert_eq!(
+            format!("{}", ParseError::MissingSocket),
+            "missing unix domain socket"
+        );
+    }
+
+    #[test]
+    #[allow(invalid_from_utf8)]
+    fn test_utf8_error_from() {
+        // Test Utf8Error conversion
+        let bad_bytes: &[u8] = &[0xFF, 0xFF];
+        let utf8_err = std::str::from_utf8(bad_bytes).unwrap_err();
+        let parse_err = ParseError::from(utf8_err);
+        match parse_err {
+            ParseError::Utf8Error(_) => {
+                assert!(format!("{parse_err}").contains("UTF-8 error"));
+            }
+            _ => panic!("Expected Utf8Error variant"),
+        }
+    }
+
+    #[test]
+    fn test_to_string_no_credentials() {
+        // Test DSN without username/password
+        let dsn = DSNBuilder::mysql().host("localhost").database("db").build();
+
+        let dsn_string = dsn.to_string();
+        assert!(dsn_string.contains("mysql://"));
+        assert!(!dsn_string.contains('@')); // No @ if no credentials
+        assert!(dsn_string.contains("tcp(localhost:3306)"));
+    }
+
+    #[test]
+    fn test_to_string_no_database() {
+        // Test DSN without database
+        let dsn = DSNBuilder::mysql()
+            .username("root")
+            .password("pass")
+            .host("localhost")
+            .build();
+
+        let dsn_string = dsn.to_string();
+        assert!(dsn_string.contains("mysql://"));
+        assert!(dsn_string.ends_with("tcp(localhost:3306)")); // No trailing /
+    }
+
+    #[test]
+    fn test_to_string_username_only() {
+        // Test DSN with username but no password
+        let dsn = DSNBuilder::mysql()
+            .username("root")
+            .host("localhost")
+            .database("db")
+            .build();
+
+        let dsn_string = dsn.to_string();
+        assert!(dsn_string.contains("mysql://root@"));
+        assert!(!dsn_string.contains(":@")); // No colon before @
+    }
+
+    #[test]
+    fn test_builder_default() {
+        // Test default builder
+        let dsn = DSNBuilder::default()
+            .driver("custom")
+            .host("localhost")
+            .port(9999)
+            .build();
+
+        assert_eq!(dsn.driver, "custom");
+        assert_eq!(dsn.port, Some(9999));
+    }
+
+    #[test]
+    fn test_builder_const_port() {
+        // Test const port function
+        let dsn = DSNBuilder::mysql().port(3307).host("localhost").build();
+
+        assert_eq!(dsn.port, Some(3307));
+    }
+
+    #[test]
+    fn test_parse_errors() {
+        // Test various parse errors
+        assert!(parse("mysql://user@tcp(host:99999)/db").is_err()); // Port out of range
+        assert!(parse("mysql://user@unix(relative/path)/db").is_err()); // Unix socket must be absolute
+        assert!(parse("mysql://user@file(relative/path)/db").is_err()); // File path must be absolute
+        assert!(parse("mysql://user@tcp()/db").is_err()); // Missing address
+        assert!(parse("mysql://user@tcp(:3306)/db").is_err()); // Missing host
+        assert!(parse("mysql://user@tcp(host:port)/db").is_err()); // Invalid port (not a number)
+    }
+
+    #[test]
+    fn test_parse_edge_cases() {
+        // These should parse but have empty driver
+        let dsn = parse("://user@tcp(host)/db").unwrap();
+        assert_eq!(dsn.driver, "");
+
+        // Test protocol variations work
+        let dsn = parse("mysql://user@udp(host:9999)/db").unwrap();
+        assert_eq!(dsn.protocol, "udp");
+    }
+
+    #[test]
+    fn test_parse_missing_protocol() {
+        // Test missing protocol before (
+        assert!(parse("mysql://user@(host)/db").is_err());
+    }
+
+    #[test]
+    fn test_dsn_builder_method() {
+        // Test DSN::builder() method
+        let dsn = DSN::builder().driver("mysql").host("localhost").build();
+
+        assert_eq!(dsn.driver, "mysql");
     }
 }

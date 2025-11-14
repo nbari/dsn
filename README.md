@@ -2,6 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/dsn.svg)](https://crates.io/crates/dsn)
 [![Test & Build](https://github.com/nbari/dsn/actions/workflows/build.yml/badge.svg)](https://github.com/nbari/dsn/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/nbari/dsn/graph/badge.svg?token=72ZRLMJGQD)](https://codecov.io/gh/nbari/dsn)
 [![docs](https://docs.rs/dsn/badge.svg)](https://docs.rs/dsn)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
