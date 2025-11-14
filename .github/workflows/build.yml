@@ -20,7 +20,7 @@ jobs:
     secrets: inherit
 
   build:
-    name: Build
+    name: Build & Check
     runs-on: ${{ matrix.os }}
     needs:
       - test
@@ -75,13 +75,5 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.target }}
-          path: |
-            target/${{ matrix.target }}/release/dsn${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          retention-days: 7
+      - name: Build library
+        run: cargo build --release --target ${{ matrix.target }}
