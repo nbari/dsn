@@ -10,7 +10,8 @@ readme = "README.md"
 keywords = ["database", "dsn", "parser"]
 categories = ["parsing", "database"]
 license = "BSD-3-Clause"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
 
 [dependencies]
 percent-encoding = "2.3.2"

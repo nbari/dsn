@@ -1,91 +1,302 @@
-# DSN (Data Source Name) parser
+# DSN - Data Source Name Parser & Builder
 
 [![crates.io](https://img.shields.io/crates/v/dsn.svg)](https://crates.io/crates/dsn)
 [![Test & Build](https://github.com/nbari/dsn/actions/workflows/build.yml/badge.svg)](https://github.com/nbari/dsn/actions/workflows/build.yml)
 [![docs](https://docs.rs/dsn/badge.svg)](https://docs.rs/dsn)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
+A lightweight, fast, and type-safe Rust library for parsing and building Data Source Name (DSN) strings for databases like MySQL, PostgreSQL, Redis, and more.
 
-DSN format:
+## Table of Contents
 
-    <driver>://<username>:<password>@<protocol>(<address>)/<database>?param1=value1&...&paramN=valueN
+- [Features](#features)
+- [Installation](#installation)
+- [DSN Format](#dsn-format)
+- [Quick Start](#quick-start)
+  - [Parsing DSN Strings](#parsing-dsn-strings)
+  - [Building DSN Strings](#building-dsn-strings)
+  - [Converting Back to String](#converting-back-to-string)
+  - [Error Handling](#error-handling)
+- [Database-Specific Builders](#database-specific-builders)
+- [Examples](#examples)
+- [Real-World Integration](#real-world-integration)
+- [Contributing](#contributing)
+- [License](#license)
 
-A DSN in its fullest form:
+## Features
 
-    driver://username:password@protocol(address)/dbname?param=value
+- **Parse DSNs**: Parse existing DSN strings into structured, type-safe data structures
+- **Build DSNs**: Construct DSN strings programmatically with a fluent builder API
+- **Percent Encoding**: Automatic percent-encoding for special characters in credentials
+- **Database Support**: Pre-configured builders for MySQL, PostgreSQL, Redis, and MariaDB
+- **Protocol Support**: TCP, Unix sockets, and file paths
+- **Type Safety**: Comprehensive error handling with descriptive error types
+- **Zero Dependencies**: Only depends on `percent-encoding`
+- **Edition 2024**: Built with the latest Rust edition
 
-The address changes depending on the protocol
+## Installation
 
-For `TCP/UDP` address have the form `host:port`, example:
+Add this to your `Cargo.toml`:
 
-    postgresql://user:pass@tcp(localhost:5432)/dbname
+```toml
+[dependencies]
+dsn = "1.1"
+```
 
-For protocol `unix` (Unix domain sockets) the address is the absolute path to the socket, for example:
+## DSN Format
 
-    mysql://user@unix(/path/to/socket)/database
+The general DSN format is:
 
-For protocol `file` (sqlite) use the absolute path as the address, example:
+```
+<driver>://<username>:<password>@<protocol>(<address>)/<database>?param1=value1&...&paramN=valueN
+```
 
-    sqlite://@file(/full/unix/path/to/file.db)
+A complete DSN example:
 
-# percent-encode
+```
+mysql://username:password@tcp(host:port)/dbname?charset=utf8mb4
+```
 
-Percent-encode username and password with characters like `@`, for example if password is:
+### Protocol Support
 
-    !A4T@hh'cUj7LXXvk"
+The address format changes depending on the protocol:
 
-From the command line you can encode it with:
+**TCP/UDP** - `host:port` format:
+```
+postgresql://user:pass@tcp(localhost:5432)/dbname
+```
 
-    echo -n "\!A4T@hh'cUj7LXXvk\"" | jq -s -R -r @uri
+**Unix Domain Sockets** - absolute path to socket:
+```
+mysql://user@unix(/var/run/mysqld/mysqld.sock)/database
+```
 
-or
+**File Paths** (SQLite) - absolute file path:
+```
+sqlite://@file(/full/unix/path/to/file.db)
+```
 
-    echo -n "\!A4T@hh'cUj7LXXvk\"" | xxd -p |sed 's/../%&/g'
+### Percent Encoding
 
-Then you can build the dsn:
+Special characters in usernames and passwords are automatically percent-encoded when using the builder API. For parsing, you can manually encode credentials:
 
+```bash
+# Using jq
+echo -n "p@ss:word!" | jq -s -R -r @uri
 
-    mysql://root:!A4T%40hh'cUj7LXXvk%22@tcp(10.0.0.1:3306)/test
+# Using xxd
+echo -n "p@ss:word!" | xxd -p | sed 's/../%&/g'
+```
 
-or
+Result:
+```
+mysql://root:p%40ss%3Aword%21@tcp(localhost:3306)/test
+```
 
-    mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test
+## Quick Start
 
+### Parsing DSN Strings
 
-# Example using the mysql create [![crates.io](https://img.shields.io/crates/v/mysql.svg)](https://crates.io/crates/mysql)
+```rust
+use dsn::parse;
 
-DSN:
+let dsn = parse("mysql://user:pass@tcp(localhost:3306)/database?charset=utf8mb4")?;
 
-    mysql://user:password@tcp(db.example.com)/mydb?tls=skip-verify
+println!("Driver: {}", dsn.driver);
+println!("Host: {}", dsn.host.unwrap());
+println!("Port: {}", dsn.port.unwrap());
+println!("Database: {}", dsn.database.unwrap());
+println!("Charset: {}", dsn.params.get("charset").unwrap());
+```
 
-Code:
+### Building DSN Strings
 
-    // if using clap asking for the DSN as an argument
-    let dsn = matches.value_of("DSN").unwrap();
-    let dsn = dsn::parse(dsn).unwrap_or_else(|e| {
-        eprintln!("{}", e);
-        process::exit(1);
-    });
+```rust
+use dsn::DSNBuilder;
 
-    let mut opts = mysql::OptsBuilder::new();
-    opts.user(dsn.username);
-    opts.pass(dsn.password);
-    opts.ip_or_hostname(dsn.host);
-    if let Some(port) = dsn.port {
-        opts.tcp_port(port);
-    }
-    opts.socket(dsn.socket);
-    opts.db_name(dsn.database);
+// MySQL
+let mysql = DSNBuilder::mysql()
+    .username("root")
+    .password("secret")
+    .host("localhost")
+    .database("myapp")
+    .param("charset", "utf8mb4")
+    .build();
 
-    // mysql ssl options
-    let mut ssl_opts = mysql::SslOpts::default();
-    if let Some(tls) = dsn.params.get("tls") {
-        if *tls == "skip-verify" {
-            ssl_opts.set_danger_accept_invalid_certs(true);
-        }
-    }
-    opts.ssl_opts(ssl_opts);
+println!("{}", mysql);
+// Output: mysql://root:secret@tcp(localhost:3306)/myapp?charset=utf8mb4
 
-    let pool = mysql::Pool::new_manual(3, 50, opts).unwrap_or_else(|e| {
-        eprintln!("Could not connect to MySQL: {}", e);
-        process::exit(1);
-    });
+// PostgreSQL with SSL
+let postgres = DSNBuilder::postgres()
+    .username("postgres")
+    .password("admin")
+    .host("db.example.com")
+    .database("production")
+    .param("sslmode", "require")
+    .build();
+
+// PostgreSQL with SSL disabled (development)
+let postgres_dev = DSNBuilder::postgres()
+    .username("dev")
+    .password("dev123")
+    .host("localhost")
+    .database("dev_db")
+    .param("sslmode", "disable")
+    .build();
+
+// Redis
+let redis = DSNBuilder::redis()
+    .host("cache.example.com")
+    .password("redis-pass")
+    .database("0")
+    .build();
+
+// Unix Socket
+let socket_dsn = DSNBuilder::mysql()
+    .username("app")
+    .socket("/var/run/mysqld/mysqld.sock")
+    .database("appdb")
+    .build();
+```
+
+### Converting Back to String
+
+DSN structs implement `Display`, so you can convert them back to strings:
+
+```rust
+use dsn::parse;
+
+let original = "mysql://root:pass@tcp(localhost:3306)/db";
+let dsn = parse(original)?;
+
+// Convert back to string
+let dsn_string = dsn.to_string();
+// or
+let dsn_string = format!("{}", dsn);
+```
+
+### Error Handling
+
+The library provides descriptive error types:
+
+```rust
+use dsn::{parse, ParseError};
+
+match parse("invalid://dsn") {
+    Ok(dsn) => println!("Parsed: {}", dsn.driver),
+    Err(ParseError::InvalidDriver) => eprintln!("Driver is invalid"),
+    Err(ParseError::InvalidPort) => eprintln!("Port number is invalid"),
+    Err(ParseError::MissingHost) => eprintln!("Host is required"),
+    Err(e) => eprintln!("Parse error: {}", e),
+}
+```
+
+Available error types:
+- `InvalidDriver` - Driver name is invalid or missing
+- `InvalidProtocol` - Protocol is invalid
+- `InvalidSocket` - Unix socket path is invalid
+- `InvalidPath` - File path is not absolute
+- `InvalidPort` - Port number is invalid or out of range
+- `InvalidParams` - Query parameters are malformed
+- `MissingAddress` - Address is missing after protocol
+- `MissingHost` - Host is missing in address
+- `Utf8Error` - UTF-8 decoding error in credentials
+
+## Database-Specific Builders
+
+Pre-configured builders with sensible defaults:
+
+| Builder | Driver | Default Port | Use Case |
+|---------|--------|--------------|----------|
+| `DSNBuilder::mysql()` | mysql | 3306 | MySQL databases |
+| `DSNBuilder::postgres()` | postgres | 5432 | PostgreSQL databases |
+| `DSNBuilder::redis()` | redis | 6379 | Redis cache/store |
+| `DSNBuilder::mariadb()` | mariadb | 3306 | MariaDB databases |
+
+## Examples
+
+See the [examples](examples/) directory for comprehensive examples:
+
+```bash
+# General DSN building examples
+cargo run --example builder
+
+# PostgreSQL SSL mode examples
+cargo run --example postgres_ssl
+```
+
+## Real-World Integration
+
+### MySQL
+
+Using with the [mysql](https://crates.io/crates/mysql) crate:
+
+```rust
+use dsn::parse;
+
+let dsn = parse("mysql://user:password@tcp(db.example.com)/mydb?tls=skip-verify")?;
+
+let mut opts = mysql::OptsBuilder::new();
+opts.user(dsn.username);
+opts.pass(dsn.password);
+opts.ip_or_hostname(dsn.host);
+if let Some(port) = dsn.port {
+    opts.tcp_port(port);
+}
+opts.db_name(dsn.database);
+
+let pool = mysql::Pool::new(opts)?;
+```
+
+### PostgreSQL
+
+Using with the [postgres](https://crates.io/crates/postgres) crate:
+
+```rust
+use dsn::DSNBuilder;
+
+let dsn = DSNBuilder::postgres()
+    .username("postgres")
+    .password("secret")
+    .host("localhost")
+    .database("mydb")
+    .param("sslmode", "require")
+    .build();
+
+let client = postgres::Client::connect(&dsn.to_string(), postgres::NoTls)?;
+```
+
+### Redis
+
+Using with the [redis](https://crates.io/crates/redis) crate:
+
+```rust
+use dsn::DSNBuilder;
+
+let dsn = DSNBuilder::redis()
+    .host("localhost")
+    .password("secret")
+    .database("0")
+    .build();
+
+let client = redis::Client::open(dsn.to_string())?;
+```
+
+## Supported Rust Versions
+
+This crate requires Rust 1.85 or later due to the use of Edition 2024.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+BSD-3-Clause - See [LICENSE](LICENSE) for details.
+
+## Links
+
+- [Documentation](https://docs.rs/dsn)
+- [Crates.io](https://crates.io/crates/dsn)
+- [Repository](https://github.com/nbari/dsn)
+- [Issue Tracker](https://github.com/nbari/dsn/issues)

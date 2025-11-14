@@ -61,22 +61,35 @@
 //!```text
 //!mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test
 //!```
+
 use core::str::Utf8Error;
 use percent_encoding::percent_decode;
 use std::{collections::BTreeMap, error::Error, fmt, str::Chars};
 
+/// Errors that can occur during DSN parsing
 #[derive(Debug)]
 pub enum ParseError {
+    /// Driver name is invalid or missing
     InvalidDriver,
+    /// Query parameters are malformed
     InvalidParams,
+    /// File path is not absolute
     InvalidPath,
+    /// Port number is invalid or out of range
     InvalidPort,
+    /// Protocol is invalid or missing
     InvalidProtocol,
+    /// Unix socket path is invalid
     InvalidSocket,
+    /// Address is missing after protocol
     MissingAddress,
+    /// Host is missing in address
     MissingHost,
+    /// Protocol is missing
     MissingProtocol,
+    /// Unix socket path is missing
     MissingSocket,
+    /// UTF-8 decoding error
     Utf8Error(Utf8Error),
 }
 
@@ -106,43 +119,141 @@ impl fmt::Display for ParseError {
 
 impl Error for ParseError {}
 
+impl fmt::Display for DSN {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+
+        write!(f, "{}://", self.driver)?;
+
+        // Add credentials
+        if let Some(ref username) = self.username {
+            let encoded_user = utf8_percent_encode(username, NON_ALPHANUMERIC);
+            write!(f, "{encoded_user}")?;
+
+            if let Some(ref password) = self.password {
+                let encoded_pass = utf8_percent_encode(password, NON_ALPHANUMERIC);
+                write!(f, ":{encoded_pass}")?;
+            }
+            write!(f, "@")?;
+        }
+
+        // Add protocol and address
+        write!(f, "{}({})", self.protocol, self.address)?;
+
+        // Add database
+        if let Some(ref database) = self.database {
+            write!(f, "/{database}")?;
+        }
+
+        // Add parameters
+        if !self.params.is_empty() {
+            write!(f, "?")?;
+            let params: Vec<String> = self
+                .params
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect();
+            write!(f, "{}", params.join("&"))?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Parsed Data Source Name (DSN) structure
+///
 /// DSN format: `driver://username:password@protocol(address)/dbname?param=value`
+///
+/// # Examples
+///
+/// ```
+/// use dsn::parse;
+///
+/// let dsn = parse("mysql://user:pass@tcp(localhost:3306)/mydb").unwrap();
+/// assert_eq!(dsn.driver, "mysql");
+/// assert_eq!(dsn.host.unwrap(), "localhost");
+/// assert_eq!(dsn.port.unwrap(), 3306);
+/// ```
 #[derive(Debug, Default)]
 pub struct DSN {
+    /// Database driver name (e.g., "mysql", "postgres", "sqlite")
     pub driver: String,
+    /// Optional username for authentication
     pub username: Option<String>,
+    /// Optional password for authentication (percent-decoded)
     pub password: Option<String>,
+    /// Connection protocol (e.g., "tcp", "unix", "file")
     pub protocol: String,
+    /// Full address string (host:port, socket path, or file path)
     pub address: String,
+    /// Hostname (only for TCP/UDP protocols)
     pub host: Option<String>,
+    /// Port number (only for TCP/UDP protocols)
     pub port: Option<u16>,
+    /// Database name
     pub database: Option<String>,
+    /// Unix socket path (only for unix protocol)
     pub socket: Option<String>,
+    /// Query string parameters as key-value pairs
     pub params: BTreeMap<String, String>,
 }
 
-/// Parse DSN
+/// Parse a DSN string into a structured `DSN` object
 ///
-/// Example:
+/// This function parses a Data Source Name (DSN) string and extracts all components
+/// including driver, credentials, protocol, address, database name, and parameters.
 ///
-///```
-///use dsn::parse;
+/// # Arguments
 ///
-///let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?charset=utf8"#).unwrap();
-///assert_eq!(dsn.driver, "mysql");
-///assert_eq!(dsn.username.unwrap(), "user");
-///assert_eq!(dsn.password.unwrap(), "o:o");
-///assert_eq!(dsn.protocol, "tcp");
-///assert_eq!(dsn.address, "localhost:3306");
-///assert_eq!(dsn.host.unwrap(), "localhost");
-///assert_eq!(dsn.port.unwrap(), 3306);
-///assert_eq!(dsn.database.unwrap(), "database");
-///assert_eq!(dsn.socket, None);
-///assert!(!dsn.params.is_empty());
-///assert_eq!(dsn.params.get("charset").unwrap(), ("utf8"));
-///```
+/// * `input` - A DSN string in the format:
+///   `driver://username:password@protocol(address)/database?param=value`
+///
+/// # Returns
+///
+/// Returns a `Result` containing the parsed `DSN` struct on success, or a
+/// `ParseError` if the DSN string is malformed.
+///
 /// # Errors
-/// [`ParseError`](enum.ParseError.html)
+///
+/// Returns `ParseError` in the following cases:
+/// - `InvalidDriver` - Missing or invalid driver name
+/// - `InvalidProtocol` - Missing or invalid protocol
+/// - `InvalidSocket` - Unix socket path doesn't start with `/`
+/// - `InvalidPath` - File path is not absolute
+/// - `InvalidPort` - Port number is invalid or out of range (0-65535)
+/// - `MissingAddress` - Address is missing after protocol
+/// - `MissingHost` - Host is missing in TCP/UDP address
+/// - `InvalidParams` - Query parameters are malformed
+/// - `Utf8Error` - Percent-encoded credentials contain invalid UTF-8
+///
+/// # Examples
+///
+/// Basic TCP connection:
+/// ```
+/// use dsn::parse;
+///
+/// let dsn = parse(r#"mysql://user:o%3Ao@tcp(localhost:3306)/database?charset=utf8"#).unwrap();
+/// assert_eq!(dsn.driver, "mysql");
+/// assert_eq!(dsn.username.unwrap(), "user");
+/// assert_eq!(dsn.password.unwrap(), "o:o");
+/// assert_eq!(dsn.protocol, "tcp");
+/// assert_eq!(dsn.address, "localhost:3306");
+/// assert_eq!(dsn.host.unwrap(), "localhost");
+/// assert_eq!(dsn.port.unwrap(), 3306);
+/// assert_eq!(dsn.database.unwrap(), "database");
+/// assert_eq!(dsn.socket, None);
+/// assert!(!dsn.params.is_empty());
+/// assert_eq!(dsn.params.get("charset").unwrap(), "utf8");
+/// ```
+///
+/// Unix socket connection:
+/// ```
+/// use dsn::parse;
+///
+/// let dsn = parse(r"mysql://user@unix(/var/run/mysql.sock)/mydb").unwrap();
+/// assert_eq!(dsn.protocol, "unix");
+/// assert_eq!(dsn.socket.unwrap(), "/var/run/mysql.sock");
+/// ```
 pub fn parse(input: &str) -> Result<DSN, ParseError> {
     // create an empty DSN
     let mut dsn = DSN::default();
@@ -168,7 +279,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
     // address) <host:port|/path/to/socket>
     dsn.address = get_address(chars)?;
 
-    match dsn.protocol.as_ref() {
+    match dsn.protocol.as_str() {
         "unix" => {
             if !dsn.address.starts_with('/') {
                 return Err(ParseError::InvalidSocket);
@@ -185,10 +296,7 @@ pub fn parse(input: &str) -> Result<DSN, ParseError> {
             dsn.host = Some(host);
 
             if !port.is_empty() {
-                dsn.port = match port.parse::<u16>() {
-                    Ok(n) => Some(n),
-                    Err(_) => return Err(ParseError::InvalidPort),
-                }
+                dsn.port = Some(port.parse::<u16>().map_err(|_| ParseError::InvalidPort)?);
             }
         }
     }
@@ -365,11 +473,7 @@ fn get_database(chars: &mut Chars) -> String {
     let mut database = String::new();
     for c in chars {
         match c {
-            '/' => {
-                if database.is_empty() {
-                    continue;
-                }
-            }
+            '/' if database.is_empty() => {}
             '?' => break,
             _ => database.push(c),
         }
@@ -389,22 +493,303 @@ fn get_database(chars: &mut Chars) -> String {
 ///assert_eq!(dsn.params.get("param3"), None);
 ///```
 fn get_params(params_string: &str) -> Result<BTreeMap<String, String>, ParseError> {
-    let params: BTreeMap<String, String> = params_string
+    params_string
         .split('&')
-        .map(|kv| kv.split('=').collect::<Vec<&str>>())
-        .map(|vec| {
-            if vec.len() != 2 {
+        .map(|kv| {
+            let parts: Vec<&str> = kv.split('=').collect();
+            if parts.len() != 2 {
                 return Err(ParseError::InvalidParams);
             }
-            Ok((vec[0].to_string(), vec[1].to_string()))
+            Ok((parts[0].to_string(), parts[1].to_string()))
         })
-        .collect::<Result<_, _>>()?;
-    Ok(params)
+        .collect()
+}
+
+impl DSN {
+    /// Create a new DSN builder
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dsn::DSN;
+    ///
+    /// let dsn = DSN::builder()
+    ///     .driver("mysql")
+    ///     .username("root")
+    ///     .password("secret")
+    ///     .host("localhost")
+    ///     .port(3306)
+    ///     .database("mydb")
+    ///     .build();
+    ///
+    /// assert_eq!(dsn.to_string(), "mysql://root:secret@tcp(localhost:3306)/mydb");
+    /// ```
+    #[must_use]
+    pub fn builder() -> DSNBuilder {
+        DSNBuilder::default()
+    }
+}
+
+/// Builder for constructing DSN strings
+///
+/// # Examples
+///
+/// ```
+/// use dsn::DSN;
+///
+/// // MySQL with TCP
+/// let mysql = DSN::builder()
+///     .driver("mysql")
+///     .username("root")
+///     .password("secret")
+///     .host("localhost")
+///     .port(3306)
+///     .database("mydb")
+///     .param("charset", "utf8mb4")
+///     .build();
+///
+/// // PostgreSQL
+/// let postgres = DSN::builder()
+///     .driver("postgres")
+///     .username("postgres")
+///     .password("pass")
+///     .host("db.example.com")
+///     .port(5432)
+///     .database("production")
+///     .param("sslmode", "require")
+///     .build();
+///
+/// // Redis
+/// let redis = DSN::builder()
+///     .driver("redis")
+///     .host("localhost")
+///     .port(6379)
+///     .database("0")
+///     .build();
+///
+/// // MySQL with Unix socket
+/// let mysql_sock = DSN::builder()
+///     .driver("mysql")
+///     .username("app")
+///     .socket("/var/run/mysqld/mysqld.sock")
+///     .database("appdb")
+///     .build();
+/// ```
+#[derive(Debug, Default)]
+pub struct DSNBuilder {
+    driver: String,
+    username: Option<String>,
+    password: Option<String>,
+    protocol: Option<String>,
+    host: Option<String>,
+    port: Option<u16>,
+    socket: Option<String>,
+    database: Option<String>,
+    params: BTreeMap<String, String>,
+}
+
+impl DSNBuilder {
+    /// Set the database driver (e.g., "mysql", "postgres", "redis")
+    #[must_use]
+    pub fn driver(mut self, driver: impl Into<String>) -> Self {
+        self.driver = driver.into();
+        self
+    }
+
+    /// Set the username for authentication
+    #[must_use]
+    pub fn username(mut self, username: impl Into<String>) -> Self {
+        self.username = Some(username.into());
+        self
+    }
+
+    /// Set the password for authentication
+    #[must_use]
+    pub fn password(mut self, password: impl Into<String>) -> Self {
+        self.password = Some(password.into());
+        self
+    }
+
+    /// Set the host for TCP connection
+    #[must_use]
+    pub fn host(mut self, host: impl Into<String>) -> Self {
+        self.host = Some(host.into());
+        self.protocol = Some("tcp".to_string());
+        self
+    }
+
+    /// Set the port for TCP connection
+    #[must_use]
+    pub const fn port(mut self, port: u16) -> Self {
+        self.port = Some(port);
+        self
+    }
+
+    /// Set a Unix socket path
+    #[must_use]
+    pub fn socket(mut self, socket: impl Into<String>) -> Self {
+        self.socket = Some(socket.into());
+        self.protocol = Some("unix".to_string());
+        self
+    }
+
+    /// Set the database name
+    #[must_use]
+    pub fn database(mut self, database: impl Into<String>) -> Self {
+        self.database = Some(database.into());
+        self
+    }
+
+    /// Add a query parameter
+    #[must_use]
+    pub fn param(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.params.insert(key.into(), value.into());
+        self
+    }
+
+    /// Build the DSN
+    #[must_use]
+    pub fn build(self) -> DSN {
+        let protocol = self.protocol.unwrap_or_else(|| "tcp".to_string());
+
+        let (address, host, socket) = if let Some(socket_path) = self.socket {
+            // Unix socket
+            (socket_path.clone(), None, Some(socket_path))
+        } else {
+            // TCP/UDP
+            let host_name = self.host.clone().unwrap_or_else(|| "localhost".to_string());
+            let addr = self
+                .port
+                .map_or_else(|| host_name.clone(), |port| format!("{host_name}:{port}"));
+            (addr, Some(host_name), None)
+        };
+
+        DSN {
+            driver: self.driver,
+            username: self.username,
+            password: self.password,
+            protocol,
+            address,
+            host,
+            port: self.port,
+            database: self.database,
+            socket,
+            params: self.params,
+        }
+    }
+}
+
+impl DSNBuilder {
+    /// Create a MySQL/MariaDB DSN builder with common defaults
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dsn::DSNBuilder;
+    ///
+    /// let dsn = DSNBuilder::mysql()
+    ///     .username("root")
+    ///     .password("secret")
+    ///     .host("localhost")
+    ///     .database("mydb")
+    ///     .build();
+    ///
+    /// assert_eq!(dsn.driver, "mysql");
+    /// assert_eq!(dsn.port, Some(3306));
+    /// ```
+    #[must_use]
+    pub fn mysql() -> Self {
+        Self {
+            driver: "mysql".to_string(),
+            protocol: Some("tcp".to_string()),
+            port: Some(3306),
+            ..Default::default()
+        }
+    }
+
+    /// Create a `PostgreSQL` DSN builder with common defaults
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dsn::DSNBuilder;
+    ///
+    /// let dsn = DSNBuilder::postgres()
+    ///     .username("postgres")
+    ///     .password("pass")
+    ///     .host("localhost")
+    ///     .database("mydb")
+    ///     .build();
+    ///
+    /// assert_eq!(dsn.driver, "postgres");
+    /// assert_eq!(dsn.port, Some(5432));
+    /// ```
+    #[must_use]
+    pub fn postgres() -> Self {
+        Self {
+            driver: "postgres".to_string(),
+            protocol: Some("tcp".to_string()),
+            port: Some(5432),
+            ..Default::default()
+        }
+    }
+
+    /// Create a Redis DSN builder with common defaults
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dsn::DSNBuilder;
+    ///
+    /// let dsn = DSNBuilder::redis()
+    ///     .host("localhost")
+    ///     .password("secret")
+    ///     .database("0")
+    ///     .build();
+    ///
+    /// assert_eq!(dsn.driver, "redis");
+    /// assert_eq!(dsn.port, Some(6379));
+    /// ```
+    #[must_use]
+    pub fn redis() -> Self {
+        Self {
+            driver: "redis".to_string(),
+            protocol: Some("tcp".to_string()),
+            port: Some(6379),
+            ..Default::default()
+        }
+    }
+
+    /// Create a `MariaDB` DSN builder (alias for `MySQL`)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dsn::DSNBuilder;
+    ///
+    /// let dsn = DSNBuilder::mariadb()
+    ///     .username("root")
+    ///     .host("localhost")
+    ///     .database("mydb")
+    ///     .build();
+    ///
+    /// assert_eq!(dsn.driver, "mariadb");
+    /// assert_eq!(dsn.port, Some(3306));
+    /// ```
+    #[must_use]
+    pub fn mariadb() -> Self {
+        Self {
+            driver: "mariadb".to_string(),
+            protocol: Some("tcp".to_string()),
+            port: Some(3306),
+            ..Default::default()
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse;
+    use super::{DSNBuilder, parse};
 
     #[test]
     fn test_parse_password() {
@@ -414,43 +799,179 @@ mod tests {
 
     #[test]
     fn test_parse_driver() {
-        let dsn = parse(r#"mysql://user:pass@host:port/database"#).unwrap();
+        let dsn = parse(r"mysql://user:pass@host:port/database").unwrap();
         assert_eq!(dsn.driver, "mysql");
     }
 
     #[test]
     fn test_parse_driver_postgres() {
-        let dsn = parse(r#"postgres://user:pass@host:port/database"#).unwrap();
+        let dsn = parse(r"postgres://user:pass@host:port/database").unwrap();
         assert_eq!(dsn.driver, "postgres");
     }
 
     #[test]
     fn test_parse_username() {
-        let dsn = parse(r#"mysql://user:pass@host:port/database"#).unwrap();
+        let dsn = parse(r"mysql://user:pass@host:port/database").unwrap();
         assert_eq!(dsn.username.unwrap(), "user");
     }
 
     #[test]
     fn test_parse_protocol() {
-        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        let dsn = parse(r"mysql://user:pass@tcp(host:3306)/database").unwrap();
         assert_eq!(dsn.protocol, "tcp");
     }
 
     #[test]
     fn test_parse_address() {
-        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        let dsn = parse(r"mysql://user:pass@tcp(host:3306)/database").unwrap();
         assert_eq!(dsn.address, "host:3306");
     }
 
     #[test]
     fn test_parse_host() {
-        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        let dsn = parse(r"mysql://user:pass@tcp(host:3306)/database").unwrap();
         assert_eq!(dsn.host.unwrap(), "host");
     }
 
     #[test]
     fn test_parse_port() {
-        let dsn = parse(r#"mysql://user:pass@tcp(host:3306)/database"#).unwrap();
+        let dsn = parse(r"mysql://user:pass@tcp(host:3306)/database").unwrap();
         assert_eq!(dsn.port.unwrap(), 3306);
+    }
+
+    #[test]
+    fn test_builder_mysql() {
+        let dsn = DSNBuilder::mysql()
+            .username("root")
+            .password("secret")
+            .host("localhost")
+            .database("mydb")
+            .param("charset", "utf8mb4")
+            .build();
+
+        assert_eq!(dsn.driver, "mysql");
+        assert_eq!(dsn.username.as_deref(), Some("root"));
+        assert_eq!(dsn.password.as_deref(), Some("secret"));
+        assert_eq!(dsn.host.as_deref(), Some("localhost"));
+        assert_eq!(dsn.port, Some(3306));
+        assert_eq!(dsn.database.as_deref(), Some("mydb"));
+        assert_eq!(dsn.params.get("charset"), Some(&"utf8mb4".to_string()));
+    }
+
+    #[test]
+    fn test_builder_postgres() {
+        let dsn = DSNBuilder::postgres()
+            .username("postgres")
+            .password("pass")
+            .host("db.example.com")
+            .database("production")
+            .param("sslmode", "require")
+            .build();
+
+        assert_eq!(dsn.driver, "postgres");
+        assert_eq!(dsn.port, Some(5432));
+        assert_eq!(dsn.params.get("sslmode"), Some(&"require".to_string()));
+    }
+
+    #[test]
+    fn test_builder_redis() {
+        let dsn = DSNBuilder::redis()
+            .host("localhost")
+            .password("secret")
+            .database("0")
+            .build();
+
+        assert_eq!(dsn.driver, "redis");
+        assert_eq!(dsn.port, Some(6379));
+        assert_eq!(dsn.database.as_deref(), Some("0"));
+    }
+
+    #[test]
+    fn test_builder_unix_socket() {
+        let dsn = DSNBuilder::mysql()
+            .username("app")
+            .socket("/var/run/mysqld/mysqld.sock")
+            .database("appdb")
+            .build();
+
+        assert_eq!(dsn.protocol, "unix");
+        assert_eq!(dsn.socket.as_deref(), Some("/var/run/mysqld/mysqld.sock"));
+        assert_eq!(dsn.address, "/var/run/mysqld/mysqld.sock");
+    }
+
+    #[test]
+    fn test_to_string_basic() {
+        let dsn = DSNBuilder::mysql()
+            .username("root")
+            .password("secret")
+            .host("localhost")
+            .database("mydb")
+            .build();
+
+        let dsn_string = dsn.to_string();
+        assert!(dsn_string.contains("mysql://"));
+        assert!(dsn_string.contains("root"));
+        assert!(dsn_string.contains("secret"));
+        assert!(dsn_string.contains("localhost:3306"));
+        assert!(dsn_string.contains("/mydb"));
+    }
+
+    #[test]
+    fn test_to_string_with_params() {
+        let dsn = DSNBuilder::postgres()
+            .username("user")
+            .password("pass")
+            .host("localhost")
+            .database("db")
+            .param("sslmode", "require")
+            .param("connect_timeout", "10")
+            .build();
+
+        let dsn_string = dsn.to_string();
+        assert!(dsn_string.contains('?'));
+        assert!(dsn_string.contains("sslmode=require"));
+        assert!(dsn_string.contains("connect_timeout=10"));
+    }
+
+    #[test]
+    fn test_to_string_special_chars() {
+        let dsn = DSNBuilder::mysql()
+            .username("user@host")
+            .password("p@ss:word!")
+            .host("localhost")
+            .database("mydb")
+            .build();
+
+        let dsn_string = dsn.to_string();
+        // Should be percent-encoded
+        assert!(dsn_string.contains("%40")); // @
+        assert!(!dsn_string.contains("user@host"));
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        let original = "mysql://root:secret@tcp(localhost:3306)/mydb?charset=utf8mb4";
+        let parsed = parse(original).unwrap();
+        let rebuilt = parsed.to_string();
+
+        // Parse the rebuilt string to verify it's valid
+        let reparsed = parse(&rebuilt).unwrap();
+        assert_eq!(parsed.driver, reparsed.driver);
+        assert_eq!(parsed.username, reparsed.username);
+        assert_eq!(parsed.host, reparsed.host);
+        assert_eq!(parsed.port, reparsed.port);
+        assert_eq!(parsed.database, reparsed.database);
+    }
+
+    #[test]
+    fn test_builder_mariadb() {
+        let dsn = DSNBuilder::mariadb()
+            .username("root")
+            .host("localhost")
+            .database("mydb")
+            .build();
+
+        assert_eq!(dsn.driver, "mariadb");
+        assert_eq!(dsn.port, Some(3306));
     }
 }

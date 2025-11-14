@@ -3,7 +3,7 @@ use dsn::parse;
 #[test]
 // Connect to database through a socket
 fn test_parse_driver1() {
-    let dsn = parse(r#"mysql://user@unix(/path/to/socket)/pear"#).unwrap();
+    let dsn = parse(r"mysql://user@unix(/path/to/socket)/pear").unwrap();
     assert_eq!(dsn.driver, "mysql");
     assert_eq!(dsn.username.unwrap(), "user");
     assert_eq!(dsn.password, None);
@@ -19,8 +19,8 @@ fn test_parse_driver1() {
 #[test]
 // Connect to database on a non standard port
 fn test_parse_driver2() {
-    let dsn = parse(r#"pgsql://user:pass@tcp(localhost:5555)/pear"#).unwrap();
-    println!("{:#?}", dsn);
+    let dsn = parse(r"pgsql://user:pass@tcp(localhost:5555)/pear").unwrap();
+    println!("{dsn:#?}");
     assert_eq!(dsn.driver, "pgsql");
     assert_eq!(dsn.username.unwrap(), "user");
     assert_eq!(dsn.password.unwrap(), "pass");
@@ -36,8 +36,8 @@ fn test_parse_driver2() {
 #[test]
 // Connect to database on a non standard port
 fn test_parse_driver3() {
-    let dsn = parse(r#"sqlite://@file(/full/unix/path/to/file.db)/?mode=0660"#).unwrap();
-    println!("{:#?}", dsn);
+    let dsn = parse(r"sqlite://@file(/full/unix/path/to/file.db)/?mode=0660").unwrap();
+    println!("{dsn:#?}");
     assert_eq!(dsn.driver, "sqlite");
     assert_eq!(dsn.username, None);
     assert_eq!(dsn.password, None);
@@ -55,7 +55,7 @@ fn test_parse_driver3() {
 // Missing params
 fn test_parse_driver4() {
     assert!(
-        parse(r#"mysql://@unix(/tmp/mysql.sock)/?tls=false&cert"#).is_err(),
+        parse(r"mysql://@unix(/tmp/mysql.sock)/?tls=false&cert").is_err(),
         "params are wrong"
     );
 }
@@ -63,8 +63,8 @@ fn test_parse_driver4() {
 #[test]
 // empty params
 fn test_parse_driver5() {
-    let dsn = parse(r#"mysql://@unix(/tmp/mysql.sock)/?charset=utf8&tls=false&cert="#).unwrap();
-    println!("{:#?}", dsn);
+    let dsn = parse(r"mysql://@unix(/tmp/mysql.sock)/?charset=utf8&tls=false&cert=").unwrap();
+    println!("{dsn:#?}");
     assert_eq!(dsn.driver, "mysql");
     assert_eq!(dsn.username, None);
     assert_eq!(dsn.password, None);
@@ -83,8 +83,8 @@ fn test_parse_driver5() {
 // empty params
 fn password_decode1() {
     // echo -n "\!A4T@hh'cUj7LXXvk\"" | xxd -p |sed 's/../%&/g'
-    let dsn = parse(r#"mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test"#).unwrap();
-    println!("{:#?}", dsn);
+    let dsn = parse(r"mysql://root:%21%41%34%54%40%68%68%27%63%55%6a%37%4c%58%58%76%6b%22@tcp(10.0.0.1:3306)/test").unwrap();
+    println!("{dsn:#?}");
     assert_eq!(dsn.driver, "mysql");
     assert_eq!(dsn.username.unwrap(), "root");
     assert_eq!(dsn.password.unwrap(), r#"!A4T@hh'cUj7LXXvk""#);
@@ -101,8 +101,8 @@ fn password_decode1() {
 // empty params
 fn password_decode2() {
     // echo -n "\!A4T@hh'cUj7LXXvk\"" | jq -s -R -r @uri
-    let dsn = parse(r#"mysql://root:!A4T%40hh'cUj7LXXvk%22@tcp(10.0.0.1:3306)/test"#).unwrap();
-    println!("{:#?}", dsn);
+    let dsn = parse(r"mysql://root:!A4T%40hh'cUj7LXXvk%22@tcp(10.0.0.1:3306)/test").unwrap();
+    println!("{dsn:#?}");
     assert_eq!(dsn.driver, "mysql");
     assert_eq!(dsn.username.unwrap(), "root");
     assert_eq!(dsn.password.unwrap(), r#"!A4T@hh'cUj7LXXvk""#);
@@ -117,9 +117,9 @@ fn password_decode2() {
 
 #[test]
 fn test_params() {
-    let dsn = parse(r#"postgres://postgres:password@tcp(host.tld:5432)/database?sslmode=require"#)
-        .unwrap();
-    println!("{:#?}", dsn);
+    let dsn =
+        parse(r"postgres://postgres:password@tcp(host.tld:5432)/database?sslmode=require").unwrap();
+    println!("{dsn:#?}");
     assert_eq!(dsn.driver, "postgres");
     assert_eq!(dsn.username.unwrap(), "postgres");
     assert_eq!(dsn.password.unwrap(), "password");
