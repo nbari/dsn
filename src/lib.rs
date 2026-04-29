@@ -174,7 +174,7 @@ impl fmt::Display for DSN {
 /// assert_eq!(dsn.host.unwrap(), "localhost");
 /// assert_eq!(dsn.port.unwrap(), 3306);
 /// ```
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DSN {
     /// Database driver name (e.g., "mysql", "postgres", "sqlite")
     pub driver: String,
