@@ -1,5 +1,7 @@
 //! Example showing `PostgreSQL` DSN with different SSL modes
 
+#![allow(clippy::unwrap_used)]
+
 use dsn::{DSNBuilder, parse};
 
 fn main() {

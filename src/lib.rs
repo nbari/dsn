@@ -496,11 +496,11 @@ fn get_params(params_string: &str) -> Result<BTreeMap<String, String>, ParseErro
     params_string
         .split('&')
         .map(|kv| {
-            let parts: Vec<&str> = kv.split('=').collect();
-            if parts.len() != 2 {
-                return Err(ParseError::InvalidParams);
+            let mut parts = kv.splitn(2, '=');
+            match (parts.next(), parts.next()) {
+                (Some(key), Some(value)) => Ok((key.to_string(), value.to_string())),
+                _ => Err(ParseError::InvalidParams),
             }
-            Ok((parts[0].to_string(), parts[1].to_string()))
         })
         .collect()
 }
@@ -788,6 +788,7 @@ impl DSNBuilder {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::{DSN, DSNBuilder, ParseError, parse};
 
@@ -1159,9 +1160,7 @@ mod tests {
 
     #[test]
     fn test_dsn_builder_clone() {
-        let builder1 = DSNBuilder::mysql()
-            .username("root")
-            .host("localhost");
+        let builder1 = DSNBuilder::mysql().username("root").host("localhost");
 
         let builder2 = builder1.clone().database("db1").build();
         let builder3 = builder1.database("db2").build();

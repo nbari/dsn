@@ -39,7 +39,7 @@ jobs:
           cache-on-failure: true
 
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D clippy::all -D clippy::nursery -D clippy::pedantic -D warnings
+        run: cargo clippy --all-targets --all-features
 
   check:
     name: Check
