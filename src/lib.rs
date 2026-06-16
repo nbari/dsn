@@ -174,7 +174,7 @@ impl fmt::Display for DSN {
 /// assert_eq!(dsn.host.unwrap(), "localhost");
 /// assert_eq!(dsn.port.unwrap(), 3306);
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DSN {
     /// Database driver name (e.g., "mysql", "postgres", "sqlite")
     pub driver: String,
@@ -575,7 +575,7 @@ impl DSN {
 ///     .database("appdb")
 ///     .build();
 /// ```
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DSNBuilder {
     driver: String,
     username: Option<String>,
@@ -1114,5 +1114,59 @@ mod tests {
         let dsn = DSN::builder().driver("mysql").host("localhost").build();
 
         assert_eq!(dsn.driver, "mysql");
+    }
+
+    #[test]
+    fn test_dsn_clone() {
+        let original = parse("mysql://user:pass@tcp(localhost:3306)/mydb?charset=utf8").unwrap();
+        let cloned = original.clone();
+
+        assert_eq!(original.driver, cloned.driver);
+        assert_eq!(original.username, cloned.username);
+        assert_eq!(original.password, cloned.password);
+        assert_eq!(original.protocol, cloned.protocol);
+        assert_eq!(original.address, cloned.address);
+        assert_eq!(original.host, cloned.host);
+        assert_eq!(original.port, cloned.port);
+        assert_eq!(original.database, cloned.database);
+        assert_eq!(original.params, cloned.params);
+    }
+
+    #[test]
+    fn test_dsn_eq() {
+        let dsn1 = parse("mysql://user:pass@tcp(localhost:3306)/mydb").unwrap();
+        let dsn2 = parse("mysql://user:pass@tcp(localhost:3306)/mydb").unwrap();
+        let dsn3 = parse("mysql://user:pass@tcp(localhost:3307)/mydb").unwrap();
+
+        assert_eq!(dsn1, dsn2);
+        assert_ne!(dsn1, dsn3);
+    }
+
+    #[test]
+    fn test_dsn_hash() {
+        use std::collections::HashSet;
+
+        let dsn1 = parse("mysql://user:pass@tcp(localhost:3306)/mydb").unwrap();
+        let dsn2 = parse("mysql://user:pass@tcp(localhost:3306)/mydb").unwrap();
+
+        let mut set = HashSet::new();
+        set.insert(dsn1.clone());
+        set.insert(dsn2);
+
+        assert_eq!(set.len(), 1);
+        assert!(set.contains(&dsn1));
+    }
+
+    #[test]
+    fn test_dsn_builder_clone() {
+        let builder1 = DSNBuilder::mysql()
+            .username("root")
+            .host("localhost");
+
+        let builder2 = builder1.clone().database("db1").build();
+        let builder3 = builder1.database("db2").build();
+
+        assert_eq!(builder2.database.as_deref(), Some("db1"));
+        assert_eq!(builder3.database.as_deref(), Some("db2"));
     }
 }

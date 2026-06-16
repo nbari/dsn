@@ -18,6 +18,7 @@ A lightweight, fast, and type-safe Rust library for parsing and building Data So
   - [Building DSN Strings](#building-dsn-strings)
   - [Converting Back to String](#converting-back-to-string)
   - [Error Handling](#error-handling)
+- [Clone, Compare & Hash](#clone-compare--hash)
 - [Database-Specific Builders](#database-specific-builders)
 - [Examples](#examples)
 - [Real-World Integration](#real-world-integration)
@@ -28,6 +29,7 @@ A lightweight, fast, and type-safe Rust library for parsing and building Data So
 
 - **Parse DSNs**: Parse existing DSN strings into structured, type-safe data structures
 - **Build DSNs**: Construct DSN strings programmatically with a fluent builder API
+- **Clone & Compare**: DSN structs implement `Clone`, `PartialEq`, `Eq`, and `Hash`
 - **Percent Encoding**: Automatic percent-encoding for special characters in credentials
 - **Database Support**: Pre-configured builders for MySQL, PostgreSQL, Redis, and MariaDB
 - **Protocol Support**: TCP, Unix sockets, and file paths
@@ -41,7 +43,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dsn = "1.2"
+dsn = "1.3"
 ```
 
 ## DSN Format
@@ -202,6 +204,33 @@ Available error types:
 - `MissingAddress` - Address is missing after protocol
 - `MissingHost` - Host is missing in address
 - `Utf8Error` - UTF-8 decoding error in credentials
+
+## Clone, Compare & Hash
+
+DSN structs implement `Clone`, `PartialEq`, `Eq`, and `Hash`, enabling common patterns:
+
+```rust
+use dsn::{parse, DSNBuilder};
+use std::collections::HashMap;
+
+// Clone a DSN for multiple connections
+let dsn = parse("mysql://user:pass@tcp(localhost:3306)/mydb").unwrap();
+let dsn_replica = dsn.clone();
+
+// Compare DSNs
+let dsn1 = parse("mysql://user@tcp(localhost:3306)/db").unwrap();
+let dsn2 = parse("mysql://user@tcp(localhost:3306)/db").unwrap();
+assert_eq!(dsn1, dsn2);
+
+// Use DSN as HashMap key
+let mut connections: HashMap<dsn::DSN, String> = HashMap::new();
+connections.insert(dsn, "primary".to_string());
+
+// Clone builders to create variants
+let base = DSNBuilder::mysql().username("root").host("localhost");
+let dev_dsn = base.clone().database("dev").build();
+let prod_dsn = base.database("prod").build();
+```
 
 ## Database-Specific Builders
 

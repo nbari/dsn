@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-16
+
+### Added
+- **Clone trait for DSN**: The `DSN` struct now derives `Clone`, enabling easy duplication of parsed DSN values. This is useful for passing DSN to multiple database connections, storing in collections, or using with async runtimes that need owned copies. ([#2](https://github.com/nbari/dsn/issues/2), [#3](https://github.com/nbari/dsn/pull/3))
+- **PartialEq, Eq, Hash traits for DSN**: Enables comparing DSN structs with `==` and using them as keys in `HashMap`/`HashSet`.
+- **Clone trait for DSNBuilder**: Allows cloning partially-built builders to create multiple similar DSNs.
+
 ## [1.2.0] - 2025-11-14
 
 ### Added
@@ -73,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <driver>://<username>:<password>@<protocol>(<address>)/<database>?param1=value1
 ```
 
-[Unreleased]: https://github.com/nbari/dsn/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/nbari/dsn/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/nbari/dsn/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/nbari/dsn/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/nbari/dsn/releases/tag/v1.1.2
