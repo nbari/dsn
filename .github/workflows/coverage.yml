@@ -38,7 +38,7 @@ jobs:
           fail_ci_if_error: true
 
       - name: Upload to Coveralls
-        uses: coverallsapp/github-action@v3
+        uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: lcov.info
